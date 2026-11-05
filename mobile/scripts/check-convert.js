@@ -66,6 +66,15 @@ const checks = {
     assert.strictEqual(mt.isDemo([{ ...after, source: 'device' }, undefined]), false);
     assert.strictEqual(ms.demoSource.listForWorkout('demo-sam', 'demo-legs-0929').length, 3);
   },
+  'a planned workout from a before test taken today fills in Log a workout': () => {
+    const b = (id, at, planned, workout_id = null) => ({ id, when: 'before', recorded_at: at, planned, workout_id });
+    const tests = [b('old', '2026-11-03T18:00', { name: 'Run', date: '2026-11-03' }),
+      b('linked', '2026-11-04T07:00', { name: 'Ride', date: '2026-11-04' }, 'w1'),
+      b('early', '2026-11-04T08:00', { name: 'Upper body', date: '2026-11-04' }),
+      b('late', '2026-11-04T17:00', { name: 'Leg day', date: '2026-11-04' }), b('none', '2026-11-04T18:00', null)];
+    assert.deepStrictEqual(mt.todaysPlan(tests, '2026-11-04'), { name: 'Leg day', date: '2026-11-04' });
+    assert.strictEqual(mt.todaysPlan(tests, '2026-11-05'), null);
+  },
   'the placeholder recovery rule: level from the newest test, ready time from its %': () => {
     const t = (when, at, pct) => ({ when, recorded_at: at, vs_before_pct: pct });
     const after = mt.scheduleFor([t('before', '2026-09-29T18:05', null), t('after', '2026-09-29T19:15', 21)]);

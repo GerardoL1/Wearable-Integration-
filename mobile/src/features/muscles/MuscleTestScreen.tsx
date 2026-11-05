@@ -13,6 +13,7 @@ import { LiveText } from '../../components/LiveText';
 import { Notice } from '../../components/Notice';
 import { Page } from '../../components/Page';
 import { Panel } from '../../components/Panel';
+import { Chips } from '../../components/Editors';
 import { ProgressBar } from '../../components/ProgressBar';
 import { StepBar } from '../../components/SetupFrame';
 import { Text } from '../../components/Text';
@@ -20,7 +21,10 @@ import { demoSettings, muscleTestSource as source } from '../../lib/muscleTestSo
 import {
   HOLD_SECONDS, LiveSample, MuscleTest, pctText, REST_SECONDS, scheduleFor, STEP, TEST_SETUP, TestWhen,
 } from '../../lib/muscleTests';
+import { dateValue, WORKOUT_PICKS } from '../../lib/logWorkout';
 import { useSession } from '../../state/session';
+import { DateTimeField } from '../train/DateTimeField';
+import { Box } from '../train/LogWorkoutScreen';
 import { DemoNote, LiveSignal, ScheduleRows, usePreviewSignal } from './parts';
 import { useMuscleTestsVersion } from './useMuscleTests';
 
@@ -54,7 +58,11 @@ export default function MuscleTestScreen() {
   const workoutId = params.workoutId ?? null;
   useMuscleTestsVersion();
 
-  const [phase, setPhase] = useState<'ready' | 'holding' | 'done'>('ready');
+  const [phase, setPhase] = useState<'ready' | 'holding' | 'done' | 'plan'>('ready');
+  // The plan step after a before test: only what and when, since times and sweat come after training.
+  const [planName, setPlanName] = useState('');
+  const [planDate, setPlanDate] = useState(() => dateValue(new Date()));
+  const [planError, setPlanError] = useState<string | null>(null);
   const [samples, setSamples] = useState<LiveSample[]>([]);
   const [result, setResult] = useState<MuscleTest | null>(null);
   const stop = useRef<(() => void) | null>(null);
@@ -146,6 +154,46 @@ export default function MuscleTestScreen() {
     );
   }
 
+  if (phase === 'plan' && result) {
+    function goTrain() {
+      if (!planName.trim()) return setPlanError('Type a name for the workout.');
+      source.plan(result!.id, { name: planName.trim(), date: planDate });
+      router.replace('/train');
+    }
+    const picked = WORKOUT_PICKS.includes(planName) ? planName : null;
+    return (
+      <Page>
+        <View style={styles.column}>
+          <StepBar label={step} step={STEP[when]} />
+          <Text variant="greeting" accessibilityRole="header">What are you training?</Text>
+          <Text variant="body" color="textSecondary" style={styles.space8}>
+            So your before test finds its workout later. Times come from your watch, or you add them after.
+          </Text>
+          <View style={[styles.space24, styles.fields]}>
+            <View style={styles.fields}>
+              <Box id="plan-name" label="Workout" spoken="Workout name" value={planName} placeholder="e.g. Leg day"
+                error={planError ?? undefined} editable onChange={(v) => {
+                  setPlanName(v);
+                  setPlanError(null);
+                }} />
+              <Chips name="Quick picks" options={WORKOUT_PICKS.map((p) => ({ value: p, label: p }))} value={picked}
+                onPick={(p) => {
+                  setPlanName(p);
+                  setPlanError(null);
+                }} />
+              {planError ? <LiveText error nativeID="plan-name-error" variant="bodySmall" color="low">{planError}</LiveText> : null}
+            </View>
+            <DateTimeField id="plan-date" label="Date" mode="date" value={planDate} onChange={setPlanDate} />
+          </View>
+          <View style={styles.actions}>
+            <Button title="Go train" onPress={goTrain} />
+            <Button title="Skip" kind="text" onPress={() => router.replace('/train')} />
+          </View>
+        </View>
+      </Page>
+    );
+  }
+
   if (phase === 'done' && result) {
     const schedule = scheduleFor(
       result.workout_id ? source.listForWorkout(userId, result.workout_id) : [result],
@@ -174,7 +222,7 @@ export default function MuscleTestScreen() {
         <View style={styles.actions}>
           {when === 'before' ? (
             <>
-              <Button title="Start a workout" onPress={() => router.replace('/train/new')} />
+              <Button title="Start a workout" onPress={() => setPhase('plan')} />
               <Button title="Back to Today" kind="text" onPress={() => router.replace('/today')} />
             </>
           ) : (
@@ -228,4 +276,5 @@ const styles = StyleSheet.create({
   space24: { marginTop: 24 },
   ends: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   actions: { marginTop: 28, gap: 12 },
+  fields: { gap: 18 },
 });

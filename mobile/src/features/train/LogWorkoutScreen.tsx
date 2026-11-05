@@ -19,7 +19,10 @@ import { SubPageHeader } from '../../components/SubPageHeader';
 import { Text } from '../../components/Text';
 import { fieldError } from '../../lib/a11y';
 import { checkWorkout, dateValue, MAX_NAME, WORKOUT_PICKS, WorkoutErrors, WorkoutForm, workoutBody } from '../../lib/logWorkout';
+import { muscleTestSource } from '../../lib/muscleTestSource';
+import { todaysPlan } from '../../lib/muscleTests';
 import { errorText } from '../../lib/useLoad';
+import { useSession } from '../../state/session';
 import { useTheme } from '../../theme/theme';
 import { radius, type } from '../../theme/tokens';
 import { DateTimeField } from './DateTimeField';
@@ -30,8 +33,8 @@ const AFTER_SAVE = [
   'It shows in Train and All workouts as “Added in the app”.',
 ];
 
-/** A tinted text box with its label and error, like Log a sweat session's fields. */
-function Box({ id, label, value, onChange, placeholder, error, unit, number, editable, spoken }: {
+/** A tinted text box with its label and error, like Log a sweat session's fields. The muscle test's plan step uses it too. */
+export function Box({ id, label, value, onChange, placeholder, error, unit, number, editable, spoken }: {
   id: string; label: string; value: string; onChange: (t: string) => void; placeholder: string;
   error?: string; unit?: string; number?: boolean; editable: boolean; spoken: string;
 }) {
@@ -56,7 +59,13 @@ function Box({ id, label, value, onChange, placeholder, error, unit, number, edi
 export default function LogWorkoutScreen() {
   const api = useApi();
   const { isWide } = useTheme();
-  const [form, setForm] = useState<WorkoutForm>(() => ({ name: '', date: dateValue(new Date()), time: '', length: '' }));
+  const { userId } = useSession();
+  // A plan from today's before test fills in what and when. Only the times are left after training.
+  const [form, setForm] = useState<WorkoutForm>(() => {
+    const today = dateValue(new Date());
+    const plan = todaysPlan(muscleTestSource.listRecent(userId), today);
+    return { name: plan?.name ?? '', date: plan?.date ?? today, time: '', length: '' };
+  });
   const [errors, setErrors] = useState<WorkoutErrors>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);

@@ -23,6 +23,8 @@ export type MuscleTest = {
   quality_ok: boolean;
   quality_note: string | null;
   source: TestSource;
+  // Before tests only: what the person said they'd train. The workout itself is made later, with real times.
+  planned?: { name: string; date: string } | null;
 };
 
 export type MuscleTestSchedule = {
@@ -131,6 +133,14 @@ export function recoveryOf(s: MuscleTestSchedule, now: Date): Recovery | null {
 export function readyText(r: Recovery, now: Date): string {
   const hours = Math.ceil((parse(r.ready_at).getTime() - now.getTime()) / 3600_000);
   return r.level === 'ready' || hours <= 0 ? 'Ready now' : `Ready in ~${hours} h`;
+}
+
+/** The plan from a before test taken on this date and not linked yet, newest first, for Log a workout. */
+export function todaysPlan(tests: MuscleTest[], date: string): { name: string; date: string } | null {
+  const t = tests
+    .filter((x) => x.when === 'before' && x.workout_id === null && x.planned?.date === date)
+    .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0];
+  return t?.planned ?? null;
 }
 
 /** Only demo results carry the "Demo data, not from a sensor" line. */

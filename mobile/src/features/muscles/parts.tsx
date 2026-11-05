@@ -83,7 +83,8 @@ export function ScheduleRows({ schedule: s, results, children }: {
     ? `${done(s.next_morning)} · ${harderText(s.next_morning.vs_before_pct)}` : s.next_morning ? done(s.next_morning) : null;
   return (
     <Panel>
-      <ListRow label="Before your workout" value={s.before ? done(s.before) : 'Not done'} />
+      <ListRow label="Before your workout"
+        value={s.before ? `${s.before.planned ? `${s.before.planned.name} · ` : ''}${done(s.before)}` : 'Not done'} />
       <ListRow label="After your workout" value={after} />
       <ListRow label="Next morning"
         value={morning ?? (s.next_due_by ? dueText(new Date(s.next_due_by))
