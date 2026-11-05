@@ -6,6 +6,7 @@
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
+import { BodyMap } from '../../components/BodyMap';
 import { Button } from '../../components/Button';
 import { ListRow } from '../../components/ListRow';
 import { Page } from '../../components/Page';
@@ -62,6 +63,7 @@ export default function MusclesScreen() {
           <Text variant="body" color="textSecondary" style={styles.text}>
             {`Your last muscle test, ${dayClockText(r.tested_at)}, was ${harderText(r.pct)} to hold than before your workout.`}
           </Text>
+          <View style={styles.section}><BodyMap levels={{ quads: r.level }} /></View>
           <View style={styles.section}>
             <SectionHeader title="By muscle" note="Ready again" />
             <Panel>
