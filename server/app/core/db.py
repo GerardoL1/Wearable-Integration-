@@ -15,7 +15,13 @@ from pathlib import Path
 import pandas as pd
 
 # Tests point this somewhere else. The default sits in server/, next to main.py.
-DB_PATH = os.environ.get("RECOVERY_DB", str(Path(__file__).resolve().parents[2] / "platform.db"))
+REAL_DB = Path(__file__).resolve().parents[2] / "platform.db"
+DB_PATH = os.environ.get("RECOVERY_DB", str(REAL_DB))
+
+# An AI test run once wrote a made-up user into the real database. Claude Code sets CLAUDECODE in every
+# command it runs, so those runs can't open it at all, even when they forget RECOVERY_DB.
+if os.environ.get("CLAUDECODE") and Path(DB_PATH).resolve() == REAL_DB:
+    raise RuntimeError("Claude Code must not open server/platform.db. Set RECOVERY_DB to a scratch file.")
 
 METRICS = {"heart_rate": "count/min", "resting_heart_rate": "count/min", "hrv_sdnn": "ms"}
 STAGES = ("in_bed", "awake", "core", "deep", "rem", "asleep_unspecified")
