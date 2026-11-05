@@ -66,6 +66,21 @@ const checks = {
     assert.strictEqual(mt.isDemo([{ ...after, source: 'device' }, undefined]), false);
     assert.strictEqual(ms.demoSource.listForWorkout('demo-sam', 'demo-legs-0929').length, 3);
   },
+  'the placeholder recovery rule: level from the newest test, ready time from its %': () => {
+    const t = (when, at, pct) => ({ when, recorded_at: at, vs_before_pct: pct });
+    const after = mt.scheduleFor([t('before', '2026-09-29T18:05', null), t('after', '2026-09-29T19:15', 21)]);
+    const night = new Date(2026, 8, 29, 22, 0);
+    let r = mt.recoveryOf(after, night);
+    assert.deepStrictEqual([r.level, r.pct, r.ready_at], ['fatigued', 21, '2026-10-01T13:15']);
+    assert.strictEqual(mt.readyText(r, night), 'Ready in ~40 h');
+    const morning = mt.scheduleFor([t('before', '2026-09-29T18:05', null), t('after', '2026-09-29T19:15', 21),
+      t('next_morning', '2026-09-30T07:50', 8)]);
+    r = mt.recoveryOf(morning, new Date(2026, 8, 30, 8, 0));
+    assert.deepStrictEqual([r.level, r.pct], ['recovering', 8]);
+    r = mt.recoveryOf(morning, new Date(2026, 9, 5, 8, 0));
+    assert.deepStrictEqual([r.level, mt.readyText(r, new Date(2026, 9, 5, 8, 0))], ['ready', 'Ready now']);
+    assert.strictEqual(mt.recoveryOf(mt.scheduleFor([t('before', '2026-09-29T18:05', null)]), night), null);
+  },
   'the hold signal rises when the hold starts and the test lasts 35 seconds': () => {
     assert.ok(mt.demoLevel(2000, 0.5) < 0.1);
     assert.ok(mt.demoLevel(10000, 0.5) > 0.3);

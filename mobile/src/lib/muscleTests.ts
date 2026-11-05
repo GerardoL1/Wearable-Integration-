@@ -105,6 +105,34 @@ export function linkableBefore(tests: MuscleTest[], workoutStartLocal: string): 
     .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
 }
 
+// Placeholder recovery rule until the team decides it (docs/open_decisions.md, "Muscle recovery").
+export const FATIGUED_FROM_PCT = 15;
+export const RECOVERING_FROM_PCT = 5;
+export const READY_HOURS_PER_PCT = 2;
+
+export type Recovery = { level: 'fatigued' | 'recovering' | 'ready'; pct: number; tested_at: string; ready_at: string };
+
+/**
+ * Where a tested muscle is now: from the next-morning test if there is one, else the after test. It's ready again
+ * READY_HOURS_PER_PCT hours per % after that test (+21% is about 42 h), and ready once that time has passed.
+ * Null before there's an after test.
+ */
+export function recoveryOf(s: MuscleTestSchedule, now: Date): Recovery | null {
+  const latest = s.next_morning ?? s.after;
+  if (!latest || latest.vs_before_pct === null) return null;
+  const pct = latest.vs_before_pct;
+  const ready = parse(latest.recorded_at);
+  ready.setMinutes(ready.getMinutes() + Math.max(0, pct) * READY_HOURS_PER_PCT * 60);
+  const level = ready <= now || pct < RECOVERING_FROM_PCT ? 'ready' : pct >= FATIGUED_FROM_PCT ? 'fatigued' : 'recovering';
+  return { level, pct, tested_at: latest.recorded_at, ready_at: localIso(ready) };
+}
+
+/** "Ready in ~30 h", or "Ready now". */
+export function readyText(r: Recovery, now: Date): string {
+  const hours = Math.ceil((parse(r.ready_at).getTime() - now.getTime()) / 3600_000);
+  return r.level === 'ready' || hours <= 0 ? 'Ready now' : `Ready in ~${hours} h`;
+}
+
 /** Only demo results carry the "Demo data, not from a sensor" line. */
 export const isDemo = (tests: (MuscleTest | undefined)[]) => tests.some((t) => t?.source === 'demo');
 
