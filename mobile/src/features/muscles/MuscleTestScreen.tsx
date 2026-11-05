@@ -16,7 +16,7 @@ import { Panel } from '../../components/Panel';
 import { ProgressBar } from '../../components/ProgressBar';
 import { StepBar } from '../../components/SetupFrame';
 import { Text } from '../../components/Text';
-import { muscleTestSource as source, TEST_MS } from '../../lib/muscleTestSource';
+import { demoSettings, muscleTestSource as source, TEST_MS } from '../../lib/muscleTestSource';
 import {
   HOLD_SECONDS, LiveSample, MuscleTest, pctText, REST_SECONDS, scheduleFor, STEP, TEST_SETUP, TestWhen,
 } from '../../lib/muscleTests';
@@ -35,7 +35,7 @@ const clock = (seconds: number) => `0:${String(Math.max(0, Math.ceil(seconds))).
 
 export default function MuscleTestScreen() {
   const { userId } = useSession();
-  const params = useLocalSearchParams<{ when?: string; workoutId?: string }>();
+  const params = useLocalSearchParams<{ when?: string; workoutId?: string; weak?: string }>();
   const when: TestWhen = params.when === 'after' || params.when === 'next_morning' ? params.when : 'before';
   const workoutId = params.workoutId ?? null;
   useMuscleTestsVersion();
@@ -48,6 +48,8 @@ export default function MuscleTestScreen() {
   useEffect(() => () => stop.current?.(), []);
 
   function start() {
+    // Demo only: "&weak=1" in the address forces a weak signal, so testers can see that state.
+    demoSettings.weakSignal = source.kind === 'demo' && params.weak === '1';
     setSamples([]);
     setResult(null);
     setPhase('holding');
@@ -73,6 +75,7 @@ export default function MuscleTestScreen() {
     const left = resting ? REST_SECONDS - t : REST_SECONDS + HOLD_SECONDS - t;
     return (
       <Page>
+        <View style={styles.column}>
         <StepBar label={step} step={STEP[when]} />
         <Text variant="h1" accessibilityRole="header">{resting ? 'Rest first' : 'Hold still'}</Text>
         <Text variant="body" color="textSecondary" style={styles.space8}>
@@ -90,6 +93,7 @@ export default function MuscleTestScreen() {
         <View style={styles.space24}><LiveSignal samples={samples} /></View>
         <Text variant="bodySmall" color="textSecondary" style={styles.space12}>The test stops on its own after 30 seconds.</Text>
         <Button title="Stop the test" kind="text" style={styles.space24} onPress={cancel} />
+      </View>
       </Page>
     );
   }
@@ -97,6 +101,7 @@ export default function MuscleTestScreen() {
   if (phase === 'done' && result && !result.quality_ok) {
     return (
       <Page>
+        <View style={styles.column}>
         <StepBar label={step} step={STEP[when]} />
         <Text variant="h1" accessibilityRole="header">{TITLE[when]}</Text>
         <View style={styles.space24}>
@@ -105,6 +110,7 @@ export default function MuscleTestScreen() {
           </Notice>
         </View>
         <DemoNote show={result.source === 'demo'} />
+      </View>
       </Page>
     );
   }
@@ -122,6 +128,7 @@ export default function MuscleTestScreen() {
         : `Down from ${pctText(schedule.after?.vs_before_pct ?? 0)} right after your workout. They're ready again when this is back near 0%.`;
     return (
       <Page>
+        <View style={styles.column}>
         <StepBar label={step} step={STEP[when]} />
         <Text variant="h1" accessibilityRole="header">{title}</Text>
         <Text variant="body" color="textSecondary" style={styles.space8}>{intro}</Text>
@@ -150,12 +157,14 @@ export default function MuscleTestScreen() {
             </>
           )}
         </View>
+      </View>
       </Page>
     );
   }
 
   return (
     <Page>
+        <View style={styles.column}>
       <StepBar label={step} step={STEP[when]} />
       <Text variant="h1" accessibilityRole="header">{TITLE[when]}</Text>
       <Text variant="body" color="textSecondary" style={styles.space8}>{INTRO[when]}</Text>
@@ -174,15 +183,18 @@ export default function MuscleTestScreen() {
         <Button title="Skip this test" kind="text" onPress={() => leave(workoutId
           ? { pathname: '/train/workout/[workoutId]', params: { workoutId } } : '/muscles')} />
       </View>
-    </Page>
+    </View>
+      </Page>
   );
 }
 
 const styles = StyleSheet.create({
+  // One readable column on the computer, like the forms.
+  column: { maxWidth: 560 },
   space8: { marginTop: 8 },
   space12: { marginTop: 12 },
   space16: { marginTop: 16 },
   space24: { marginTop: 24 },
   ends: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  actions: { marginTop: 28, gap: 12, maxWidth: 520 },
+  actions: { marginTop: 28, gap: 12 },
 });

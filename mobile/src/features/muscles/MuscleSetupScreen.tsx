@@ -33,6 +33,7 @@ export default function MuscleSetupScreen() {
   if (step === 2) {
     return (
       <Page>
+        <View style={styles.column}>
         <StepBar label="Patch setup · Step 2 of 3" step={2} />
         <Text variant="h1" accessibilityRole="header">Where will it go today?</Text>
         <Text variant="body" color="textSecondary" style={styles.space8}>
@@ -50,11 +51,13 @@ export default function MuscleSetupScreen() {
           <Button title="Continue" onPress={() => setStep(3)} />
           <Button title="Cancel" kind="text" onPress={back} />
         </View>
+      </View>
       </Page>
     );
   }
   return (
     <Page>
+        <View style={styles.column}>
       <StepBar label="Patch setup · Step 3 of 3" step={3} />
       <Text variant="h1" accessibilityRole="header">Check the signal</Text>
       <Text variant="body" color="textSecondary" style={styles.space8}>Tighten your quads three times, then relax.</Text>
@@ -71,14 +74,17 @@ export default function MuscleSetupScreen() {
         <Button title="Start the muscle test" onPress={() => router.replace({ pathname: '/muscles/test', params: { when: 'before' } })} />
         <Button title="Place it again" kind="text" onPress={() => setStep(2)} />
       </View>
-    </Page>
+    </View>
+      </Page>
   );
 }
 
 const styles = StyleSheet.create({
+  // One readable column on the computer, like the forms.
+  column: { maxWidth: 560 },
   space8: { marginTop: 8 },
   space12: { marginTop: 12 },
   space16: { marginTop: 16 },
   space24: { marginTop: 24 },
-  actions: { marginTop: 28, gap: 12, maxWidth: 520 },
+  actions: { marginTop: 28, gap: 12 },
 });
