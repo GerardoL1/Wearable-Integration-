@@ -19,6 +19,10 @@ function load(...parts) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
   const m = new Module(file);
+  // App files import each other without the .ts ending, so those are loaded the same way.
+  m.require = (id) => (id.startsWith('.')
+    ? load(path.relative(path.join(__dirname, '..', 'src'), path.resolve(path.dirname(file), id + '.ts')))
+    : require(id));
   m._compile(js, file);
   return m.exports;
 }
@@ -26,9 +30,63 @@ const c = load('health', 'convert.ts');
 const w = load('lib', 'weight.ts');
 const s = load('lib', 'sweat.ts');
 const lw = load('lib', 'logWorkout.ts');
+const mt = load('lib', 'muscleTests.ts');
+const ms = load('lib', 'muscleTestSource.ts');
 const ci = load('lib', 'checkin.ts');
 
 const checks = {
+  'muscle tests land in the right schedule slot': () => {
+    const t = (id, when, at, pct) => ({ id, when, recorded_at: at, vs_before_pct: pct, workout_id: 'w', source: 'demo' });
+    let s = mt.scheduleFor([t('b', 'before', '2026-09-29T18:05', null)]);
+    assert.deepStrictEqual([s.before.id, s.after, s.next_due], ['b', undefined, 'after']);
+    s = mt.scheduleFor([t('a', 'after', '2026-09-29T19:15', 21), t('b', 'before', '2026-09-29T18:05', null)]);
+    assert.deepStrictEqual([s.after.id, s.next_due, s.next_due_by], ['a', 'next_morning', '2026-09-30T10:00']);
+    s = mt.scheduleFor([t('b', 'before', '2026-09-29T18:05', null), t('a', 'after', '2026-09-29T19:15', 21),
+      t('n', 'next_morning', '2026-09-30T07:50', 8)]);
+    assert.deepStrictEqual([s.next_morning.id, s.next_due], ['n', null]);
+    assert.deepStrictEqual([mt.pctText(21), mt.harderText(21), mt.harderText(-5), mt.clockText('2026-09-29T18:05')],
+      ['+21%', '21% harder', '5% easier', '6:05 pm']);
+  },
+  'a before test links only to a workout starting within 4 hours after it': () => {
+    const before = (id, at, workout_id = null) => ({ id, when: 'before', recorded_at: at, workout_id });
+    const all = [before('early', '2026-10-01T12:00'), before('close', '2026-10-01T17:30'),
+      before('taken', '2026-10-01T17:40', 'other'), before('after-start', '2026-10-01T18:20')];
+    assert.deepStrictEqual(mt.linkableBefore(all, '2026-10-01T18:10').map((x) => x.id), ['close']);
+  },
+  'the demo source gives the right shapes and only demo results say so': async () => {
+    const before = await ms.demoSource.finishHold('before', 'sam', 'w1');
+    const after = await ms.demoSource.finishHold('after', 'sam', 'w1');
+    assert.deepStrictEqual([before.vs_before_pct, before.workout_id, after.vs_before_pct, after.workout_id, after.source],
+      [null, null, 21, 'w1', 'demo']);
+    assert.strictEqual(after.hold_seconds, 30);
+    ms.demoSettings.weakSignal = true;
+    assert.strictEqual((await ms.demoSource.finishHold('after', 'sam', 'w1')).quality_ok, false);
+    ms.demoSettings.weakSignal = false;
+    assert.strictEqual(mt.isDemo([after]), true);
+    assert.strictEqual(mt.isDemo([{ ...after, source: 'device' }, undefined]), false);
+    assert.strictEqual(ms.demoSource.listForWorkout('demo-sam', 'demo-legs-0929').length, 3);
+  },
+  'the placeholder recovery rule: level from the newest test, ready time from its %': () => {
+    const t = (when, at, pct) => ({ when, recorded_at: at, vs_before_pct: pct });
+    const after = mt.scheduleFor([t('before', '2026-09-29T18:05', null), t('after', '2026-09-29T19:15', 21)]);
+    const night = new Date(2026, 8, 29, 22, 0);
+    let r = mt.recoveryOf(after, night);
+    assert.deepStrictEqual([r.level, r.pct, r.ready_at], ['fatigued', 21, '2026-10-01T13:15']);
+    assert.strictEqual(mt.readyText(r, night), 'Ready in ~40 h');
+    const morning = mt.scheduleFor([t('before', '2026-09-29T18:05', null), t('after', '2026-09-29T19:15', 21),
+      t('next_morning', '2026-09-30T07:50', 8)]);
+    r = mt.recoveryOf(morning, new Date(2026, 8, 30, 8, 0));
+    assert.deepStrictEqual([r.level, r.pct], ['recovering', 8]);
+    r = mt.recoveryOf(morning, new Date(2026, 9, 5, 8, 0));
+    assert.deepStrictEqual([r.level, mt.readyText(r, new Date(2026, 9, 5, 8, 0))], ['ready', 'Ready now']);
+    assert.strictEqual(mt.recoveryOf(mt.scheduleFor([t('before', '2026-09-29T18:05', null)]), night), null);
+  },
+  'the hold signal rises when the hold starts and the test lasts 35 seconds': () => {
+    assert.ok(mt.demoLevel(2000, 0.5) < 0.1);
+    assert.ok(mt.demoLevel(10000, 0.5) > 0.3);
+    assert.ok(mt.demoLevel(34000, 0.5) > mt.demoLevel(10000, 0.5));
+    assert.strictEqual(ms.TEST_MS, 35000);
+  },
   'a logged workout reports every problem at once': () => {
     const now = new Date(2026, 9, 1, 8, 30);
     assert.deepStrictEqual(lw.checkWorkout({ name: ' ', date: '2026-10-01', time: '09:00', length: '0' }, now), {

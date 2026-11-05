@@ -32,6 +32,23 @@ the model may and may not do (for example the cut-offs and the Layer 3 cap) befo
 | Hard training day | Effort of at least some level (7?), a load over some amount, or the person's own heavy days? |
 | Training load balance | Use the last 7 days against the last 28 (acute to chronic), and if so as a ratio or a difference? |
 
+## Muscle recovery (Layer 2)
+
+The app shows these with placeholders today. Fatigue is how much harder the muscle works to hold the same wall sit
+than in the before test, as a %.
+
+| Decision | Placeholder today | Where it lives |
+|---|---|---|
+| Fatigued / recovering / ready cut-offs | Fatigued from +15%, recovering from +5%, ready below +5% | `mobile/src/lib/muscleTests.ts` (`FATIGUED_FROM_PCT`, `RECOVERING_FROM_PCT`) |
+| Which test sets today's state | The next-morning test if there is one, else the after test | `muscleTests.ts` (`recoveryOf`) |
+| When a muscle is ready again | 2 hours per % after that test (+21% is about 42 h), ready once that time has passed | `muscleTests.ts` (`READY_HOURS_PER_PCT`) |
+| Muscles that weren't tested | Shown as "Not tested". Estimating them from logged exercises needs exercises and sets, and an exercise-to-muscle table | Not built |
+| Linking a before test to its workout | A before test from the 4 hours before the workout started | `muscleTests.ts` (`LINK_WINDOW_HOURS`) |
+| Next-morning test after re-sticking the patch | Compared with the before test as it is, though moving the patch changes the signal. Options: a fresh reference each morning, or a reference hold at the end of the after session | Not decided |
+| Tests with different gain settings | Not checked yet. They shouldn't be compared, since a different gain changes every % | Not decided |
+| "Within 5 minutes of the last set" for the after test | Asked for in the wording, not enforced | Not decided |
+| What makes a signal too weak to use | The demo flags it on request. A real rule (noise level, flat trace) comes with the sensor | Not decided |
+
 ## Later
 
 - Illness signals (respiratory rate, wrist temperature): when to start collecting them, and how the warning

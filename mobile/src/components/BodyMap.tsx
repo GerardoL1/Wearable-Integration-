@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { MUSCLES, type MuscleGroup } from '../lib/checkin';
 import { useTheme } from '../theme/theme';
@@ -40,15 +40,39 @@ const OUTLINE: Shape[] = [[56, 4, 28, 34, 17], [13, 169, 16, 18, 9], [111, 169, 
 
 const LABEL = Object.fromEntries(MUSCLES.map((g) => [g.value, g.label])) as Record<MuscleGroup, string>;
 
+type Level = 'fatigued' | 'recovering' | 'ready';
+export type MuscleLevels = Partial<Record<MuscleGroup, Level>>;
+const LEVEL_WORD: Record<Level, string> = { fatigued: 'Fatigued', recovering: 'Recovering', ready: 'Ready or not trained' };
+
+function levelFill(colors: ReturnType<typeof useTheme>['colors']): Record<Level, ViewStyle> {
+  return {
+    fatigued: { backgroundColor: colors.moderate },
+    // The tint alone is hard to see on a light background, so it gets the warning colour as an outline.
+    recovering: { backgroundColor: colors.warningTint, borderWidth: 1, borderColor: colors.moderate },
+    ready: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderStrong },
+  };
+}
+
+/** "Body map: quads fatigued, other muscles ready or not trained", read once for the whole map. */
+function levelsLabel(levels: MuscleLevels): string {
+  const named = MUSCLES.filter((g) => levels[g.value] && levels[g.value] !== 'ready')
+    .map((g) => `${g.label.toLowerCase()} ${levels[g.value]}`);
+  return named.length
+    ? `Body map: ${named.join(', ')}, other muscles ready or not trained`
+    : 'Body map: all muscles ready or not trained';
+}
+
 /**
  * shared: groups already drawn on the front figure (shoulders, forearms). The back copy is hidden
  * from screen readers so each muscle is read once.
+ * With levels, the shapes are only coloured in and nothing can be tapped.
  */
-function Figure({ name, groups, sore, onToggle, disabled, shared }: {
-  name: string; groups: Group[]; sore: MuscleGroup[]; onToggle: (m: MuscleGroup) => void; disabled?: boolean;
-  shared?: MuscleGroup[];
+function Figure({ name, groups, sore = [], onToggle, disabled, shared, levels }: {
+  name: string; groups: Group[]; sore?: MuscleGroup[]; onToggle?: (m: MuscleGroup) => void; disabled?: boolean;
+  shared?: MuscleGroup[]; levels?: MuscleLevels;
 }) {
   const { colors } = useTheme();
+  const fill = levelFill(colors);
   return (
     <View style={styles.side}>
       <View style={styles.figure}>
@@ -57,11 +81,15 @@ function Figure({ name, groups, sore, onToggle, disabled, shared }: {
             borderWidth: 1, borderColor: colors.borderStrong }]} />
         ))}
         {groups.flatMap((g) => g.shapes.map(([x, y, w, h, r], i) => {
+          if (levels) {
+            return <View key={`${g.m}-${i}`} aria-hidden style={[styles.shape,
+              { left: x, top: y, width: w, height: h, borderRadius: r }, fill[levels[g.m] ?? 'ready']]} />;
+          }
           const on = sore.includes(g.m);
           // The first shape of a group speaks for it, the second one is only another place to tap.
           const spoken = i === 0 && !shared?.includes(g.m);
           return (
-            <Pressable key={`${g.m}-${i}`} onPress={() => onToggle(g.m)} disabled={disabled}
+            <Pressable key={`${g.m}-${i}`} onPress={() => onToggle?.(g.m)} disabled={disabled}
               accessibilityRole="checkbox" aria-checked={on} accessibilityLabel={LABEL[g.m]}
               aria-hidden={!spoken} importantForAccessibility={spoken ? 'yes' : 'no-hide-descendants'}
               accessibilityElementsHidden={!spoken} tabIndex={spoken ? 0 : -1}
@@ -75,11 +103,40 @@ function Figure({ name, groups, sore, onToggle, disabled, shared }: {
   );
 }
 
-/** Front and back figures to tap sore muscles on, and the list of what's picked (tap a row to take it off). */
-export function BodyMap({ sore, onToggle, disabled }: {
-  sore: MuscleGroup[]; onToggle: (m: MuscleGroup) => void; disabled?: boolean;
-}) {
+/** Muscles coloured by recovery with a legend under them, for the Muscles tab. Display only. */
+function LevelMap({ levels }: { levels: MuscleLevels }) {
+  const { colors } = useTheme();
+  const fill = levelFill(colors);
+  return (
+    <View style={styles.wrap}>
+      <View role="img" accessible accessibilityLabel={levelsLabel(levels)} style={styles.figures}>
+        <Figure name="Front" groups={FRONT} levels={levels} />
+        <Figure name="Back" groups={BACK} levels={levels} />
+      </View>
+      <View aria-hidden style={styles.legend}>
+        {(Object.keys(LEVEL_WORD) as Level[]).map((l) => (
+          <View key={l} style={styles.key}>
+            <View style={[styles.swatch, fill[l]]} />
+            <Text variant="bodySmall" color="textSecondary">{LEVEL_WORD[l]}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+type Props =
+  | { sore: MuscleGroup[]; onToggle: (m: MuscleGroup) => void; disabled?: boolean; levels?: undefined }
+  | { levels: MuscleLevels; sore?: undefined; onToggle?: undefined; disabled?: undefined };
+
+/**
+ * Front and back figures to tap sore muscles on, and the list of what's picked (tap a row to take it off).
+ * Pass levels instead to only show each muscle's recovery.
+ */
+export function BodyMap(props: Props) {
   const { colors, isWide } = useTheme();
+  if (props.levels) return <LevelMap levels={props.levels} />;
+  const { sore, onToggle, disabled } = props;
   const verb = isWide ? 'click' : 'tap';
   return (
     <View style={styles.wrap}>
@@ -110,6 +167,9 @@ const styles = StyleSheet.create({
   side: { alignItems: 'center', gap: 10 },
   figure: { width: 140, height: 296 },
   shape: { position: 'absolute' },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: 20, rowGap: 8 },
+  key: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  swatch: { width: 12, height: 12, borderRadius: 3 },
   row: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
     borderRadius: radius.md },
 });
