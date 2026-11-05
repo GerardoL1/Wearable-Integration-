@@ -19,7 +19,10 @@ import { SubPageHeader } from '../../components/SubPageHeader';
 import { Text } from '../../components/Text';
 import { fieldError } from '../../lib/a11y';
 import { checkWorkout, dateValue, MAX_NAME, WORKOUT_PICKS, WorkoutErrors, WorkoutForm, workoutBody } from '../../lib/logWorkout';
+import { muscleTestSource } from '../../lib/muscleTestSource';
+import { beforeTestsOn, clockText, testBeforeStart, todaysPlan } from '../../lib/muscleTests';
 import { errorText } from '../../lib/useLoad';
+import { useSession } from '../../state/session';
 import { useTheme } from '../../theme/theme';
 import { radius, type } from '../../theme/tokens';
 import { DateTimeField } from './DateTimeField';
@@ -30,8 +33,8 @@ const AFTER_SAVE = [
   'It shows in Train and All workouts as “Added in the app”.',
 ];
 
-/** A tinted text box with its label and error, like Log a sweat session's fields. */
-function Box({ id, label, value, onChange, placeholder, error, unit, number, editable, spoken }: {
+/** A tinted text box with its label and error, like Log a sweat session's fields. The muscle test's plan step uses it too. */
+export function Box({ id, label, value, onChange, placeholder, error, unit, number, editable, spoken }: {
   id: string; label: string; value: string; onChange: (t: string) => void; placeholder: string;
   error?: string; unit?: string; number?: boolean; editable: boolean; spoken: string;
 }) {
@@ -56,8 +59,22 @@ function Box({ id, label, value, onChange, placeholder, error, unit, number, edi
 export default function LogWorkoutScreen() {
   const api = useApi();
   const { isWide } = useTheme();
-  const [form, setForm] = useState<WorkoutForm>(() => ({ name: '', date: dateValue(new Date()), time: '', length: '' }));
+  const { userId } = useSession();
+  // A plan from today's before test fills in what and when. Only the times are left after training.
+  const [form, setForm] = useState<WorkoutForm>(() => {
+    const today = dateValue(new Date());
+    const plan = todaysPlan(muscleTestSource.listRecent(userId), today);
+    return { name: plan?.name ?? '', date: plan?.date ?? today, time: '', length: '' };
+  });
   const [errors, setErrors] = useState<WorkoutErrors>({});
+  // The before test to link, picked from that day's tests. A planned one is picked already.
+  const [testId, setTestId] = useState<string>(() => {
+    const newest = beforeTestsOn(muscleTestSource.listRecent(userId), dateValue(new Date()))[0];
+    return newest?.planned ? newest.id : 'none';
+  });
+  const [testError, setTestError] = useState<string | null>(null);
+  const dayTests = beforeTestsOn(muscleTestSource.listRecent(userId), form.date);
+  const chosen = dayTests.find((x) => x.id === testId) ?? null;
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   // A ref, not state: two taps in the same moment both see state from before the first one.
@@ -76,12 +93,15 @@ export default function LogWorkoutScreen() {
     if (busy.current) return;
     const found = checkWorkout(form, new Date());
     setErrors(found);
-    if (Object.values(found).some(Boolean)) return;
+    const late = chosen && form.time && !testBeforeStart(chosen, `${form.date}T${form.time}`);
+    setTestError(late ? 'This muscle test was taken after the workout started. Pick another, or None.' : null);
+    if (Object.values(found).some(Boolean) || late) return;
     busy.current = true;
     setSaving(true);
     setSaveError(null);
     try {
       const w = await api.saveWorkout(workoutBody(form, id));
+      if (chosen) muscleTestSource.link(chosen.id, w.id);
       // Replaced, so Back from the summary goes to Train rather than to this form.
       router.replace({ pathname: '/train/workout/[workoutId]', params: { workoutId: w.id } });
     } catch (e) {
@@ -115,6 +135,20 @@ export default function LogWorkoutScreen() {
           unit="min" number onChange={(t) => set('length', t)} error={errors.length} editable={!saving} />
         {errors.length ? <LiveText error nativeID="workout-length-error" variant="bodySmall" color="low">{errors.length}</LiveText> : null}
       </View>
+      {dayTests.length ? (
+        <View style={styles.field}>
+          <Text variant="bodySmall" color={testError ? 'low' : 'textSecondary'}>Muscle test before this workout</Text>
+          <Chips name="Muscle test before this workout" value={chosen ? chosen.id : 'none'}
+            options={[...dayTests.map((x) => ({ value: x.id, label: `${x.planned?.name ?? 'Before test'} · ${clockText(x.recorded_at)}` })),
+              { value: 'none', label: 'None' }]}
+            onPick={(v) => {
+              if (saving) return;
+              setTestId(v);
+              setTestError(null);
+            }} />
+          {testError ? <LiveText error variant="bodySmall" color="low">{testError}</LiveText> : null}
+        </View>
+      ) : null}
       {saveError ? <LiveText error variant="bodySmall" color="low">{saveError}</LiveText> : null}
       <Button title="Save workout" busy={saving} busyTitle="Saving…" onPress={save} />
       <Button title="Cancel" kind="secondary" disabled={saving}

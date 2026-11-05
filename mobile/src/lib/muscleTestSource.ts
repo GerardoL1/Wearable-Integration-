@@ -17,6 +17,8 @@ export interface MuscleTestSource {
   save(test: MuscleTest): void;
   /** Links a before test (taken from the Muscles tab) to the workout it was for. */
   link(testId: string, workoutId: string): void;
+  /** Saves what the person will train on a before test, since the workout doesn't exist yet. */
+  plan(testId: string, planned: { name: string; date: string }): void;
   listForWorkout(testerId: string, workoutId: string): MuscleTest[];
   listRecent(testerId: string): MuscleTest[];
 }
@@ -83,6 +85,10 @@ export const demoSource: MuscleTestSource = {
     tests = tests.map((t) => (t.id === testId ? { ...t, workout_id: workoutId } : t));
     changed();
   },
+  plan(testId, planned) {
+    tests = tests.map((t) => (t.id === testId ? { ...t, planned } : t));
+    changed();
+  },
   listForWorkout: (testerId, workoutId) => tests.filter((t) => t.tester_id === testerId && t.workout_id === workoutId),
   listRecent: (testerId) =>
     tests.filter((t) => t.tester_id === testerId).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at)),
@@ -93,7 +99,7 @@ const notConnected = () => {
 };
 const deviceSource: MuscleTestSource = {
   kind: 'device', connect: async () => notConnected(), startHold: notConnected, finishHold: async () => notConnected(),
-  save: notConnected, link: notConnected, listForWorkout: () => [], listRecent: () => [],
+  save: notConnected, link: notConnected, plan: notConnected, listForWorkout: () => [], listRecent: () => [],
 };
 
 export const muscleTestSource: MuscleTestSource = SOURCE_KIND === 'demo' ? demoSource : deviceSource;
