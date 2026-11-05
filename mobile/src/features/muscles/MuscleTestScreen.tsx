@@ -4,8 +4,8 @@
  * Before tests aren't linked to a workout (it usually doesn't exist yet). Workout summary links them later.
  */
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ReactNode, useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, StyleSheet, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { ListRow } from '../../components/ListRow';
@@ -16,7 +16,7 @@ import { Panel } from '../../components/Panel';
 import { ProgressBar } from '../../components/ProgressBar';
 import { StepBar } from '../../components/SetupFrame';
 import { Text } from '../../components/Text';
-import { demoSettings, muscleTestSource as source, TEST_MS } from '../../lib/muscleTestSource';
+import { demoSettings, muscleTestSource as source } from '../../lib/muscleTestSource';
 import {
   HOLD_SECONDS, LiveSample, MuscleTest, pctText, REST_SECONDS, scheduleFor, STEP, TEST_SETUP, TestWhen,
 } from '../../lib/muscleTests';
@@ -24,7 +24,7 @@ import { useSession } from '../../state/session';
 import { DemoNote, LiveSignal, ScheduleRows, usePreviewSignal } from './parts';
 import { useMuscleTestsVersion } from './useMuscleTests';
 
-const TITLE: Record<TestWhen, string> = { before: 'Before your workout', after: 'After your workout', next_morning: 'Next morning' };
+const TITLE: Record<TestWhen, string> = { before: 'Before your workout', after: 'After your workout', next_morning: 'The next morning' };
 const INTRO: Record<TestWhen, string> = {
   before: 'A 30-second hold shows how fresh your quads are. Do it after your warm-up.',
   after: 'The same hold as before your workout. Do it within 5 minutes of your last set.',
@@ -32,6 +32,20 @@ const INTRO: Record<TestWhen, string> = {
 };
 
 const clock = (seconds: number) => `0:${String(Math.max(0, Math.ceil(seconds))).padStart(2, '0')}`;
+
+/** Fades its content in over 200 ms when it first shows, or shows it at once when the phone asks for less motion. */
+function FadeIn({ children }: { children: ReactNode }) {
+  const [opacity] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    let anim: Animated.CompositeAnimation | null = null;
+    AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
+      if (reduce) opacity.setValue(1);
+      else (anim = Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true })).start();
+    });
+    return () => anim?.stop();
+  }, [opacity]);
+  return <Animated.View style={{ opacity }}>{children}</Animated.View>;
+}
 
 export default function MuscleTestScreen() {
   const { userId } = useSession();
@@ -77,21 +91,32 @@ export default function MuscleTestScreen() {
       <Page>
         <View style={styles.column}>
         <StepBar label={step} step={STEP[when]} />
-        <Text variant="h1" accessibilityRole="header">{resting ? 'Rest first' : 'Hold still'}</Text>
-        <Text variant="body" color="textSecondary" style={styles.space8}>
-          {resting ? 'Stay relaxed. The hold starts in a moment.' : 'Keep your knees at 90° and breathe normally.'}
-        </Text>
-        <View style={styles.space24}>
-          <Text variant="bodySmall" color="textSecondary">{resting ? 'Hold starts in' : 'Time left'}</Text>
-          <LiveText variant="scoreMetric">{clock(left)}</LiveText>
-          <View style={styles.space8}><ProgressBar share={Math.min(1, t / (TEST_MS / 1000))} /></View>
-          <View style={styles.ends}>
-            <Text variant="bodySmall" color="textSecondary">0:00</Text>
-            <Text variant="bodySmall" color="textSecondary">{clock(HOLD_SECONDS)}</Text>
+        {/* Keyed, so the hold fades in when the rest ends, with no tap needed. */}
+        <FadeIn key={resting ? 'rest' : 'hold'}>
+          <Text variant="greeting" accessibilityRole="header">{resting ? 'Rest first' : 'Hold still'}</Text>
+          <Text variant="body" color="textSecondary" style={styles.space8}>
+            {resting ? 'Stay relaxed. The hold starts in a moment.' : 'Keep your knees at 90° and breathe normally.'}
+          </Text>
+          <View style={styles.space24}>
+            <Text variant="bodySmall" color="textSecondary">{resting ? 'Hold starts in' : 'Time left'}</Text>
+            <LiveText variant="scoreMetric">{clock(left)}</LiveText>
+            {resting ? null : (
+              <>
+                <View style={styles.space8}>
+                  <ProgressBar share={Math.min(1, (t - REST_SECONDS) / HOLD_SECONDS)} />
+                </View>
+                <View style={styles.ends}>
+                  <Text variant="bodySmall" color="textSecondary">0:00</Text>
+                  <Text variant="bodySmall" color="textSecondary">{clock(HOLD_SECONDS)}</Text>
+                </View>
+              </>
+            )}
           </View>
-        </View>
+        </FadeIn>
         <View style={styles.space24}><LiveSignal samples={samples} /></View>
-        <Text variant="bodySmall" color="textSecondary" style={styles.space12}>The test stops on its own after 30 seconds.</Text>
+        {resting ? null : (
+          <Text variant="bodySmall" color="textSecondary" style={styles.space12}>The test stops on its own after 30 seconds.</Text>
+        )}
         <Button title="Stop the test" kind="text" style={styles.space24} onPress={cancel} />
       </View>
       </Page>
@@ -103,13 +128,19 @@ export default function MuscleTestScreen() {
       <Page>
         <View style={styles.column}>
         <StepBar label={step} step={STEP[when]} />
-        <Text variant="h1" accessibilityRole="header">{TITLE[when]}</Text>
-        <View style={styles.space24}>
-          <Notice type="warning" label="Signal was weak" live action={{ label: 'Try the test again', onPress: start }}>
+        <Text variant="greeting" accessibilityRole="header">{TITLE[when]}</Text>
+        <Text variant="body" color="textSecondary" style={styles.space8}>{INTRO[when]}</Text>
+        <View style={styles.space16}>
+          <Notice type="warning" label="Signal was weak" live
+            action={{ label: 'Try the test again', onPress: () => setPhase('ready') }}>
             {`${result.quality_note ?? 'The signal was too weak to measure.'} Press the patch down firmly, then try again. This test wasn't saved.`}
           </Notice>
         </View>
         <DemoNote show={result.source === 'demo'} />
+        <View style={styles.actions}>
+          <Button title="Skip this test" kind="text" onPress={() => leave(workoutId
+            ? { pathname: '/train/workout/[workoutId]', params: { workoutId } } : '/muscles')} />
+        </View>
       </View>
       </Page>
     );
@@ -130,7 +161,7 @@ export default function MuscleTestScreen() {
       <Page>
         <View style={styles.column}>
         <StepBar label={step} step={STEP[when]} />
-        <Text variant="h1" accessibilityRole="header">{title}</Text>
+        <Text variant="greeting" accessibilityRole="header">{title}</Text>
         <Text variant="body" color="textSecondary" style={styles.space8}>{intro}</Text>
         {pct !== null ? (
           <View style={styles.space24}>
@@ -166,7 +197,7 @@ export default function MuscleTestScreen() {
     <Page>
         <View style={styles.column}>
       <StepBar label={step} step={STEP[when]} />
-      <Text variant="h1" accessibilityRole="header">{TITLE[when]}</Text>
+      <Text variant="greeting" accessibilityRole="header">{TITLE[when]}</Text>
       <Text variant="body" color="textSecondary" style={styles.space8}>{INTRO[when]}</Text>
       <View style={styles.space24}><LiveSignal samples={preview} /></View>
       <Text variant="bodySmall" color="textSecondary" style={styles.space12}>

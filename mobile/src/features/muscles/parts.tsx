@@ -75,15 +75,19 @@ export function ScheduleRows({ schedule: s, results, children }: {
 }) {
   const spans = !!s.next_morning || !!s.before && dayOf(s.before.recorded_at) !== today();
   const when = (iso: string) => (spans ? dayClockText(iso) : clockText(iso));
-  const done = (t: NonNullable<MuscleTestSchedule['before']>) =>
-    results && t.vs_before_pct !== null ? `${harderText(t.vs_before_pct)} to hold` : `Done, ${when(t.recorded_at)}`;
+  const done = (t: NonNullable<MuscleTestSchedule['before']>) => `Done, ${when(t.recorded_at)}`;
+  // With results: "21% harder to hold" after the workout, and the next morning says both when and how much.
+  const after = s.after ? (results && s.after.vs_before_pct !== null ? `${harderText(s.after.vs_before_pct)} to hold`
+    : done(s.after)) : results ? 'Not done' : s.next_due === 'after' ? 'Next' : null;
+  const morning = s.next_morning && results && s.next_morning.vs_before_pct !== null
+    ? `${done(s.next_morning)} · ${harderText(s.next_morning.vs_before_pct)}` : s.next_morning ? done(s.next_morning) : null;
   return (
     <Panel>
       <ListRow label="Before your workout" value={s.before ? done(s.before) : 'Not done'} />
-      <ListRow label="After your workout" value={s.after ? done(s.after) : s.next_due === 'after' ? 'Next' : null} />
+      <ListRow label="After your workout" value={after} />
       <ListRow label="Next morning"
-        value={s.next_morning ? done(s.next_morning) : s.next_due_by ? dueText(new Date(s.next_due_by))
-          : s.before ? dueText(morningAfter(s.before.recorded_at)) : null} />
+        value={morning ?? (s.next_due_by ? dueText(new Date(s.next_due_by))
+          : s.before ? dueText(morningAfter(s.before.recorded_at)) : null)} />
       {children}
     </Panel>
   );
