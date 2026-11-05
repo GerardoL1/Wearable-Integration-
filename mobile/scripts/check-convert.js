@@ -66,6 +66,14 @@ const checks = {
     assert.strictEqual(mt.isDemo([{ ...after, source: 'device' }, undefined]), false);
     assert.strictEqual(ms.demoSource.listForWorkout('demo-sam', 'demo-legs-0929').length, 3);
   },
+  'Log a workout offers the unlinked before tests of its date': () => {
+    const b = (id, at, workout_id = null) => ({ id, when: 'before', recorded_at: at, workout_id });
+    const tests = [b('yesterday', '2026-11-03T18:00'), b('morning', '2026-11-04T07:30'), b('linked', '2026-11-04T08:00', 'w1'),
+      b('evening', '2026-11-04T17:45'), { ...b('after', '2026-11-04T19:00'), when: 'after' }];
+    assert.deepStrictEqual(mt.beforeTestsOn(tests, '2026-11-04').map((t) => t.id), ['evening', 'morning']);
+    assert.strictEqual(mt.testBeforeStart(tests[3], '2026-11-04T18:00'), true);
+    assert.strictEqual(mt.testBeforeStart(tests[3], '2026-11-04T17:30'), false);
+  },
   'a planned workout from a before test taken today fills in Log a workout': () => {
     const b = (id, at, planned, workout_id = null) => ({ id, when: 'before', recorded_at: at, planned, workout_id });
     const tests = [b('old', '2026-11-03T18:00', { name: 'Run', date: '2026-11-03' }),

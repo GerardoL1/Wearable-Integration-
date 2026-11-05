@@ -135,6 +135,16 @@ export function readyText(r: Recovery, now: Date): string {
   return r.level === 'ready' || hours <= 0 ? 'Ready now' : `Ready in ~${hours} h`;
 }
 
+/** Before tests taken on this date and not linked to a workout yet, newest first, to pick in Log a workout. */
+export function beforeTestsOn(tests: MuscleTest[], date: string): MuscleTest[] {
+  return tests
+    .filter((t) => t.when === 'before' && t.workout_id === null && t.recorded_at.startsWith(`${date}T`))
+    .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
+}
+
+/** A before test has to come before the workout it's linked to, or "after vs before" means nothing. */
+export const testBeforeStart = (t: MuscleTest, startLocal: string) => t.recorded_at <= startLocal;
+
 /** The plan from a before test taken on this date and not linked yet, newest first, for Log a workout. */
 export function todaysPlan(tests: MuscleTest[], date: string): { name: string; date: string } | null {
   const t = tests
