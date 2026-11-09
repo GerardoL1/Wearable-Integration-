@@ -30,7 +30,8 @@ def load_notebook_definitions() -> dict:
     sys.modules[module.__name__] = module
     namespace = module.__dict__
     definition_cells = [
-        cell for cell in notebook["cells"]
+        cell
+        for cell in notebook["cells"]
         if cell["cell_type"] == "code" and cell.get("metadata", {}).get("role") == "definitions"
     ]
     if not definition_cells:
@@ -46,16 +47,18 @@ def synthetic_nights(people: int = 4, nights: int = 40) -> pd.DataFrame:
     rows = []
     for person in range(people):
         for day, date in enumerate(pd.date_range("2025-01-01", periods=nights, freq="D")):
-            rows.append({
-                "tester_id": f"P{person + 1:02d}",
-                "night_date": date.strftime("%Y-%m-%d"),
-                "device_name": "Apple Watch SE 2020",
-                "hrv_method": "SDNN",
-                "hrv": 43.0 + 2 * person + day % 7 + day * 0.1,
-                "rhr": 58.0 + person + day % 4,
-                "total_sleep_min": 390.0 + person * 4 + day % 9 * 8,
-                "ready_rating": int(3 + (person + day) % 7),
-            })
+            rows.append(
+                {
+                    "tester_id": f"P{person + 1:02d}",
+                    "night_date": date.strftime("%Y-%m-%d"),
+                    "device_name": "Apple Watch SE 2020",
+                    "hrv_method": "SDNN",
+                    "hrv": 43.0 + 2 * person + day % 7 + day * 0.1,
+                    "rhr": 58.0 + person + day % 4,
+                    "total_sleep_min": 390.0 + person * 4 + day % 9 * 8,
+                    "ready_rating": int(3 + (person + day) % 7),
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -99,7 +102,9 @@ class NotebookFeatureTests(unittest.TestCase):
         altered.loc[future, "total_sleep_min"] = 800.0
         new, _ = self.features(altered)
         columns = ["tester_id", "night_date", *self.config["derived_features"], "baseline_ready"]
-        before = original.loc[pd.to_datetime(original["night_date"]) <= pd.Timestamp("2025-01-25"), columns].reset_index(drop=True)
+        before = original.loc[
+            pd.to_datetime(original["night_date"]) <= pd.Timestamp("2025-01-25"), columns
+        ].reset_index(drop=True)
         after = new.loc[pd.to_datetime(new["night_date"]) <= pd.Timestamp("2025-01-25"), columns].reset_index(drop=True)
         pd.testing.assert_frame_equal(before, after)
 
@@ -213,9 +218,16 @@ class NotebookTrainingTests(unittest.TestCase):
         cutoff = pd.to_datetime(inputs["night_date"]).max() - pd.Timedelta(days=31)
         recent = inputs.loc[pd.to_datetime(inputs["night_date"]) >= cutoff]
         shortened = self.ns["predict_readiness"](self.bundle, recent)
+
         def latest(frame):
-            return (frame.sort_values("night_date").groupby("tester_id").tail(1)
-                    .sort_values("tester_id").reset_index(drop=True))
+            return (
+                frame.sort_values("night_date")
+                .groupby("tester_id")
+                .tail(1)
+                .sort_values("tester_id")
+                .reset_index(drop=True)
+            )
+
         pd.testing.assert_frame_equal(latest(full), latest(shortened), atol=1e-10, rtol=1e-10)
 
     def test_nested_validation_requires_multiple_people(self):
