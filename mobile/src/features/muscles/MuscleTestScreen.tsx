@@ -22,11 +22,13 @@ import {
   HOLD_SECONDS, LiveSample, MuscleTest, pctText, REST_SECONDS, scheduleFor, STEP, TEST_SETUP, TestWhen,
 } from '../../lib/muscleTests';
 import { dateValue, WORKOUT_PICKS } from '../../lib/logWorkout';
+import { signalQuality } from '../../lib/usbSerial';
+import { errorText } from '../../lib/useLoad';
 import { useSession } from '../../state/session';
 import { DateTimeField } from '../train/DateTimeField';
 import { Box } from '../train/LogWorkoutScreen';
 import { DemoNote, LiveSignal, ScheduleRows, usePreviewSignal } from './parts';
-import { useMuscleTestsVersion } from './useMuscleTests';
+import { useMuscleTestsVersion, useUsbSensor } from './useMuscleTests';
 
 const TITLE: Record<TestWhen, string> = { before: 'Before your workout', after: 'After your workout', next_morning: 'The next morning' };
 const INTRO: Record<TestWhen, string> = {
@@ -58,7 +60,8 @@ export default function MuscleTestScreen() {
   const workoutId = params.workoutId ?? null;
   useMuscleTestsVersion();
 
-  const [phase, setPhase] = useState<'ready' | 'holding' | 'done' | 'plan'>('ready');
+  const [phase, setPhase] = useState<'ready' | 'holding' | 'saving' | 'done' | 'plan' | 'lost' | 'failed'>('ready');
+  const [failure, setFailure] = useState('');
   // The plan step after a before test: only what and when, since times and sweat come after training.
   const [planName, setPlanName] = useState('');
   const [planDate, setPlanDate] = useState(() => dateValue(new Date()));
@@ -66,7 +69,10 @@ export default function MuscleTestScreen() {
   const [samples, setSamples] = useState<LiveSample[]>([]);
   const [result, setResult] = useState<MuscleTest | null>(null);
   const stop = useRef<(() => void) | null>(null);
-  const preview = usePreviewSignal();
+  const usb = source.kind === 'device';
+  const demoPreview = usePreviewSignal();
+  const sensor = useUsbSensor();
+  const preview = usb ? sensor.live : demoPreview;
   useEffect(() => () => stop.current?.(), []);
 
   function start() {
@@ -76,12 +82,18 @@ export default function MuscleTestScreen() {
     setResult(null);
     setPhase('holding');
     stop.current = source.startHold((s) => setSamples((prev) => [...prev.slice(-150), s]), async () => {
-      const test = await source.finishHold(when, userId, workoutId);
-      // A weak signal gives a number nobody should trust, so it isn't saved.
-      if (test.quality_ok) source.save(test);
-      setResult(test);
-      setPhase('done');
-    });
+      setPhase('saving');
+      try {
+        const test = await source.finishHold(when, userId, workoutId);
+        // A weak signal gives a number nobody should trust, so it isn't kept as a result.
+        if (test.quality_ok) await source.save(test);
+        setResult(test);
+        setPhase('done');
+      } catch (e) {
+        setFailure(errorText(e));
+        setPhase('failed');
+      }
+    }, () => setPhase('lost'));
   }
   function cancel() {
     stop.current?.();
@@ -131,6 +143,39 @@ export default function MuscleTestScreen() {
     );
   }
 
+  if (phase === 'saving') {
+    return (
+      <Page>
+        <View style={styles.column}>
+          <StepBar label={step} step={STEP[when]} />
+          <Text variant="greeting" accessibilityRole="header">Working out your result</Text>
+          <LiveText variant="body" color="textSecondary" style={styles.space8}>This takes a few seconds.</LiveText>
+        </View>
+      </Page>
+    );
+  }
+
+  if (phase === 'lost' || phase === 'failed') {
+    return (
+      <Page>
+        <View style={styles.column}>
+          <StepBar label={step} step={STEP[when]} />
+          <Text variant="greeting" accessibilityRole="header">{TITLE[when]}</Text>
+          <View style={styles.space16}>
+            <Notice type="warning" label={phase === 'lost' ? 'Sensor disconnected' : 'Couldn’t save the test'} live
+              action={{ label: 'Try the test again', onPress: () => setPhase('ready') }}>
+              {phase === 'lost' ? 'Check the cable, then try the test again.' : failure}
+            </Notice>
+          </View>
+          <View style={styles.actions}>
+            <Button title="Skip this test" kind="text" onPress={() => leave(workoutId
+              ? { pathname: '/train/workout/[workoutId]', params: { workoutId } } : '/muscles')} />
+          </View>
+        </View>
+      </Page>
+    );
+  }
+
   if (phase === 'done' && result && !result.quality_ok) {
     return (
       <Page>
@@ -155,10 +200,14 @@ export default function MuscleTestScreen() {
   }
 
   if (phase === 'plan' && result) {
-    function goTrain() {
+    async function goTrain() {
       if (!planName.trim()) return setPlanError('Type a name for the workout.');
-      source.plan(result!.id, { name: planName.trim(), date: planDate });
-      router.replace('/train');
+      try {
+        await source.plan(result!.id, { name: planName.trim(), date: planDate });
+        router.replace('/train');
+      } catch (e) {
+        setPlanError(`Couldn't save. ${errorText(e)}`);
+      }
     }
     const picked = WORKOUT_PICKS.includes(planName) ? planName : null;
     return (
@@ -247,10 +296,22 @@ export default function MuscleTestScreen() {
       <StepBar label={step} step={STEP[when]} />
       <Text variant="greeting" accessibilityRole="header">{TITLE[when]}</Text>
       <Text variant="body" color="textSecondary" style={styles.space8}>{INTRO[when]}</Text>
-      <View style={styles.space24}><LiveSignal samples={preview} /></View>
-      <Text variant="bodySmall" color="textSecondary" style={styles.space12}>
-        Rest for 5 seconds, then hold still until the timer ends.
-      </Text>
+      {usb && !source.canRecord ? (
+        <View style={styles.space16}>
+          <Notice type="info" label="Muscle tests need the computer">
+            Connect the sensor to a computer and use Chrome or Edge.
+          </Notice>
+        </View>
+      ) : (
+        <>
+          <View style={styles.space24}>
+            <LiveSignal samples={preview} quality={usb ? (source.connected ? signalQuality(sensor.stats) : 'Not connected') : 'Good'} />
+          </View>
+          <Text variant="bodySmall" color="textSecondary" style={styles.space12}>
+            Rest for 5 seconds, then hold still until the timer ends.
+          </Text>
+        </>
+      )}
       <Panel style={styles.space16}>
         <ListRow label="Position" value={TEST_SETUP.position} />
         <ListRow label="Load" value={TEST_SETUP.load} />
@@ -258,7 +319,8 @@ export default function MuscleTestScreen() {
         <ListRow label="Hold" value={`${HOLD_SECONDS} seconds`} />
       </Panel>
       <View style={styles.actions}>
-        <Button title="Start the hold" onPress={start} />
+        {!source.canRecord ? null : source.connected ? <Button title="Start the hold" onPress={start} />
+          : <Button title="Connect the sensor" onPress={() => router.push('/muscles/connect')} />}
         <Button title="Skip this test" kind="text" onPress={() => leave(workoutId
           ? { pathname: '/train/workout/[workoutId]', params: { workoutId } } : '/muscles')} />
       </View>

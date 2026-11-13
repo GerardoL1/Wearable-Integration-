@@ -1,6 +1,7 @@
 /**
- * Patch setup steps 2 (where the patch goes) and 3 (check the signal), the parts that don't depend on how the
- * patch connects. Step 1, pairing, waits for the hardware route. Figma "Patch setup 2 Placement" and "3 Signal".
+ * Patch setup steps 2 (where the patch goes) and 3 (check the signal). With the USB sensor, step 3 shows its live
+ * signal, and "Connect the sensor" (ConnectSensorScreen) stands in for step 1 until it's connected.
+ * Figma "Patch setup 2 Placement" and "3 Signal".
  */
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -14,8 +15,11 @@ import { Panel } from '../../components/Panel';
 import { SectionHeader } from '../../components/SectionHeader';
 import { StepBar } from '../../components/SetupFrame';
 import { Text } from '../../components/Text';
+import { Notice } from '../../components/Notice';
 import { muscleTestSource } from '../../lib/muscleTestSource';
+import { signalQuality } from '../../lib/usbSerial';
 import { DemoNote, LiveSignal, usePreviewSignal } from './parts';
+import { useMuscleTestsVersion, useUsbSensor } from './useMuscleTests';
 
 const PLACE_QUADS = [
   'Clean and dry the skin on the front of your thigh.',
@@ -27,7 +31,11 @@ const LATER = ['Hamstrings', 'Glutes', 'Chest'];
 
 export default function MuscleSetupScreen() {
   const [step, setStep] = useState<2 | 3>(2);
-  const preview = usePreviewSignal();
+  useMuscleTestsVersion();
+  const usb = muscleTestSource.kind === 'device';
+  const demoPreview = usePreviewSignal();
+  const sensor = useUsbSensor();
+  const preview = usb ? sensor.live : demoPreview;
   const back = () => (router.canGoBack() ? router.back() : router.replace('/muscles'));
 
   if (step === 2) {
@@ -61,17 +69,31 @@ export default function MuscleSetupScreen() {
       <StepBar label="Patch setup · Step 3 of 3" step={3} />
       <Text variant="h1" accessibilityRole="header">Check the signal</Text>
       <Text variant="body" color="textSecondary" style={styles.space8}>Tighten your quads three times, then relax.</Text>
-      <View style={styles.space24}><LiveSignal samples={preview} /></View>
+      {usb && !muscleTestSource.canRecord ? (
+        <View style={styles.space16}>
+          <Notice type="info" label="Muscle tests need the computer">
+            Connect the sensor to a computer and use Chrome or Edge.
+          </Notice>
+        </View>
+      ) : (
+        <View style={styles.space24}>
+          <LiveSignal samples={preview}
+            quality={usb ? (muscleTestSource.connected ? signalQuality(sensor.stats) : 'Not connected') : 'Good'} />
+        </View>
+      )}
       <Text variant="bodySmall" color="textSecondary" style={styles.space12}>
         Three clear bursts and a quiet baseline: the pads are making good contact.
       </Text>
       <Panel style={styles.space16}>
         <ListRow label="Muscle" value="Quads" />
-        <ListRow label="Patch battery" value="82%" />
+        {usb ? <ListRow label="Sensor" value={muscleTestSource.connected ? 'Connected by USB' : 'Not connected'} />
+          : <ListRow label="Patch battery" value="82%" />}
       </Panel>
       <DemoNote show={muscleTestSource.kind === 'demo'} />
       <View style={styles.actions}>
-        <Button title="Start the muscle test" onPress={() => router.replace({ pathname: '/muscles/test', params: { when: 'before' } })} />
+        {!muscleTestSource.canRecord ? null : muscleTestSource.connected ? (
+          <Button title="Start the muscle test" onPress={() => router.replace({ pathname: '/muscles/test', params: { when: 'before' } })} />
+        ) : <Button title="Connect the sensor" onPress={() => router.push('/muscles/connect')} />}
         <Button title="Place it again" kind="text" onPress={() => setStep(2)} />
       </View>
     </View>

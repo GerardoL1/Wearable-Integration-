@@ -1,30 +1,39 @@
 /**
- * Where muscle tests come from. The screens only ever talk to MuscleTestSource. For now the demo source makes a
- * believable signal in code and keeps results in memory (gone on reload, nothing goes to the server). The real
- * source waits until the hardware route is picked.
+ * Where muscle tests come from. The screens only ever talk to muscleTestSource, which is the demo or the USB
+ * sensor depending on the switch. The demo makes a believable signal in code and keeps results in memory (gone on
+ * reload, nothing goes to the server). The USB source is in usbMuscleTestSource.ts.
  */
 import {
   demoLevel, HOLD_SECONDS, LiveSample, localIso, MuscleTest, REST_SECONDS, TEST_SETUP, TestSource, TestWhen,
 } from './muscleTests';
+import { makeUsbSource } from './usbMuscleTestSource';
 
 export interface MuscleTestSource {
   readonly kind: TestSource;
+  /** False where a test can't be recorded, like the USB sensor on the iPhone. Results still show. */
+  readonly canRecord: boolean;
+  readonly connected: boolean;
+  /** Throws when it couldn't connect. */
   connect(): Promise<void>;
-  /** Plays the live signal: rest, then the hold. Stops on its own at the end. Returns a function to stop early. */
-  startHold(onSample: (s: LiveSample) => void, onDone: () => void): () => void;
-  /** The finished test's result. Not saved yet, the screen saves it only when the signal was good. */
+  /**
+   * Plays the live signal: rest, then the hold. Stops on its own at the end. onLost is called instead of onDone
+   * when the sensor goes away mid-test. Returns a function to stop early.
+   */
+  startHold(onSample: (s: LiveSample) => void, onDone: () => void, onLost?: () => void): () => void;
+  /** The finished test's result. The demo doesn't keep it yet, the screen saves it only when the signal was good. */
   finishHold(when: TestWhen, testerId: string, workoutId: string | null): Promise<MuscleTest>;
-  save(test: MuscleTest): void;
+  save(test: MuscleTest): Promise<void>;
   /** Links a before test (taken from the Muscles tab) to the workout it was for. */
-  link(testId: string, workoutId: string): void;
+  link(testId: string, workoutId: string): Promise<void>;
   /** Saves what the person will train on a before test, since the workout doesn't exist yet. */
-  plan(testId: string, planned: { name: string; date: string }): void;
+  plan(testId: string, planned: { name: string; date: string }): Promise<void>;
+  /** Fetches the tester's tests again, where they're kept somewhere else. */
+  refresh(testerId: string): Promise<void>;
   listForWorkout(testerId: string, workoutId: string): MuscleTest[];
   listRecent(testerId: string): MuscleTest[];
 }
 
-// The one switch between the demo and a real patch. Only the demo works yet.
-export const SOURCE_KIND: 'demo' | 'device' = 'demo';
+export type SourceChoice = 'demo' | 'usb';
 
 // Demo results, close to the Figma examples. weakSignal lets testers see the "Signal was weak" state.
 const DEMO_PCT: Record<TestWhen, number | null> = { before: null, after: 21, next_morning: 8 };
@@ -54,7 +63,10 @@ const changed = () => {
 
 export const demoSource: MuscleTestSource = {
   kind: 'demo',
+  canRecord: true,
+  connected: true,
   connect: async () => {},
+  refresh: async () => {},
   startHold(onSample, onDone) {
     const started = Date.now();
     const timer = setInterval(() => {
@@ -77,15 +89,15 @@ export const demoSource: MuscleTestSource = {
       quality_ok: !weak, quality_note: weak ? 'A flat trace with lots of noise.' : null, source: 'demo',
     };
   },
-  save(test) {
+  async save(test) {
     tests = [...tests.filter((t) => t.id !== test.id), test];
     changed();
   },
-  link(testId, workoutId) {
+  async link(testId, workoutId) {
     tests = tests.map((t) => (t.id === testId ? { ...t, workout_id: workoutId } : t));
     changed();
   },
-  plan(testId, planned) {
+  async plan(testId, planned) {
     tests = tests.map((t) => (t.id === testId ? { ...t, planned } : t));
     changed();
   },
@@ -94,15 +106,39 @@ export const demoSource: MuscleTestSource = {
     tests.filter((t) => t.tester_id === testerId).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at)),
 };
 
-const notConnected = () => {
-  throw new Error('Not connected yet');
-};
-const deviceSource: MuscleTestSource = {
-  kind: 'device', connect: async () => notConnected(), startHold: notConnected, finishHold: async () => notConnected(),
-  save: notConnected, link: notConnected, plan: notConnected, listForWorkout: () => [], listRecent: () => [],
-};
+export const usbSource = makeUsbSource(changed);
 
-export const muscleTestSource: MuscleTestSource = SOURCE_KIND === 'demo' ? demoSource : deviceSource;
+// The switch between the demo and the USB sensor. useMuscleTestsVersion keeps the choice between visits.
+let choice: SourceChoice = 'demo';
+export const sourceChoice = () => choice;
+export function setSourceChoice(c: SourceChoice) {
+  if (c === choice) return;
+  choice = c;
+  changed();
+}
+const current = () => (choice === 'usb' ? usbSource : demoSource);
+
+/** What the screens use: whichever source the switch picked, at the moment of each call. */
+export const muscleTestSource: MuscleTestSource = {
+  get kind() {
+    return current().kind;
+  },
+  get canRecord() {
+    return current().canRecord;
+  },
+  get connected() {
+    return current().connected;
+  },
+  connect: () => current().connect(),
+  startHold: (onSample, onDone, onLost) => current().startHold(onSample, onDone, onLost),
+  finishHold: (when, testerId, workoutId) => current().finishHold(when, testerId, workoutId),
+  save: (test) => current().save(test),
+  link: (testId, workoutId) => current().link(testId, workoutId),
+  plan: (testId, planned) => current().plan(testId, planned),
+  refresh: (testerId) => current().refresh(testerId),
+  listForWorkout: (testerId, workoutId) => current().listForWorkout(testerId, workoutId),
+  listRecent: (testerId) => current().listRecent(testerId),
+};
 
 /** For useMuscleTestsVersion: screens re-render when a test is saved or linked. */
 export function subscribeTests(l: () => void): () => void {
