@@ -47,7 +47,9 @@ than in the before test, as a %.
 | Next-morning test after re-sticking the patch | Compared with the before test as it is, though moving the patch changes the signal. Options: a fresh reference each morning, or a reference hold at the end of the after session | Not decided |
 | Tests with different gain settings | Not checked yet. They shouldn't be compared, since a different gain changes every % | Not decided |
 | "Within 5 minutes of the last set" for the after test | Asked for in the wording, not enforced | Not decided |
-| What makes a signal too weak to use | The demo flags it on request. A real rule (noise level, flat trace) comes with the sensor | Not decided |
+| What makes a signal too weak to use | No 20 s hold found, under 900 samples a second, over 1% gaps, over 1% clipping, or a hold under 30 ADC counts above rest | `server/app/services/muscle_tests.py` (`MIN_RISE_ADC` and the rules in `process`) |
+| Finding the hold | Half-second averages, above halfway from the resting level to the 90th percentile after the rest, the longest such stretch, at least 20 s | `muscle_tests.py` (`process`) |
+| Units of env_mean | ADC counts above the resting median (0 to 1023 range), from the sensor's own envelope output. Only the % between tests is shown | `muscle_tests.py` |
 
 ## Later
 
