@@ -1,32 +1,29 @@
 """Behavioral checks for the notebook using in-memory synthetic fixtures only.
 
 These observations are test fixtures, not readiness labels for the original CSVs.
-Run with: python -m unittest discover -s tests -v
+Run with: python -m pytest tests/test_ridge_notebook.py (from preprocessing/)
 """
 
 from __future__ import annotations
 
 import copy
 import json
-from pathlib import Path
 import pickle
 import sys
 import types
 import unittest
-
-ROOT = Path(__file__).resolve().parents[1]
-LOCAL_DEPS = ROOT / ".notebook_deps"
-if LOCAL_DEPS.is_dir():
-    sys.path.insert(0, str(LOCAL_DEPS))
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+NOTEBOOK = Path(__file__).resolve().parents[1] / "layer1" / "__notebook_source__.ipynb"
+
 
 def load_notebook_definitions() -> dict:
-    notebook = json.loads((ROOT / "__notebook_source__.ipynb").read_text(encoding="utf-8"))
+    notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
     module = types.ModuleType("ridge_notebook_under_test")
-    module.__file__ = str(ROOT / "__notebook_source__.ipynb")
+    module.__file__ = str(NOTEBOOK)
     sys.modules[module.__name__] = module
     namespace = module.__dict__
     definition_cells = [
@@ -38,7 +35,7 @@ def load_notebook_definitions() -> dict:
         raise AssertionError("Notebook has no executable definition cells")
     for cell in definition_cells:
         source = "".join(cell["source"])
-        exec(compile(source, str(ROOT / "__notebook_source__.ipynb"), "exec"), namespace)
+        exec(compile(source, str(NOTEBOOK), "exec"), namespace)
     return namespace
 
 

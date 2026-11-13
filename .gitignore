@@ -36,6 +36,7 @@ mock_exports/
 # Preprocessing outputs and caches
 preprocessing/layer1_features_*.csv
 .pytest_cache/
+.ipynb_checkpoints/
 
 # Layer 1 tester outputs
 preprocessing/agent_testing/build/
