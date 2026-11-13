@@ -12,6 +12,8 @@ dependencies = ["pandas>=2.2", "numpy>=1.26"]
 [project.optional-dependencies]
 # The Streamlit test platform (app.py).
 app = ["streamlit>=1.40", "plotly>=5.20"]
+# The Ridge readiness notebook in layer1/.
+model = ["scikit-learn>=1.5", "joblib>=1.4"]
 
 [tool.setuptools]
 # layer1 is the preprocessing itself, agent_testing is the Layer 1 tester that checks it.
