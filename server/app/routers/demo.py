@@ -16,6 +16,8 @@ router = APIRouter(prefix=API_V1, tags=["demo"])
 # The mock people last sleep on the night of 30 Sep 2026 (they wake on 1 Oct), so the demo
 # clock sits just after that night's update time.
 DEMO_CLOCK = "2026-10-01T08:30:00"
+# A filled-in profile, so Today greets them by name and Profile isn't empty in a demo.
+DEMO_PROFILES = {"sam": ("Sam", 31, 72.0), "alex": ("Alex", 27, 81.0), "jordan": ("Jordan", 38, 64.0)}
 
 
 @router.post("/demo-users/{person}", response_model=DemoUser)
@@ -43,7 +45,11 @@ def load_demo(person: Literal["sam", "alex", "jordan"]):
             "users",
         ):
             conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
-        conn.execute("INSERT INTO users (user_id, clock_local) VALUES (?, ?)", (user_id, DEMO_CLOCK))
+        name, age, weight_kg = DEMO_PROFILES[person]
+        conn.execute(
+            "INSERT INTO users (user_id, clock_local, name, age, weight_kg) VALUES (?, ?, ?, ?, ?)",
+            (user_id, DEMO_CLOCK, name, age, weight_kg),
+        )
         import_export(sample_path(person), conn, user_id)
     processing.process_user(user_id, force=True)
     return {"user_id": user_id, "clock_local": DEMO_CLOCK}

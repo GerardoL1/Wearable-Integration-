@@ -43,25 +43,33 @@ export const demoSettings = { weakSignal: false };
 export const TEST_MS = (REST_SECONDS + HOLD_SECONDS) * 1000;
 const SAMPLE_MS = 20; // 50 a second, enough to draw
 
-const hoursAgo = (now: number, h: number) => localIso(new Date(now - h * 3600_000));
-const DEMO_BASE = { tester_id: 'demo-sam', workout_id: 'demo-legs-0929', muscle: 'quads', side: 'left' as const,
+const DEMO_TESTER = 'demo-sam';
+const DEMO_BASE = { tester_id: DEMO_TESTER, workout_id: 'demo-legs-0929', muscle: 'quads', side: 'left' as const,
   hold_seconds: HOLD_SECONDS, ...TEST_SETUP, quality_ok: true, quality_note: null, source: 'demo' as const };
 
+// Sam's demo clock, the same as DEMO_CLOCK in server/app/routers/demo.py. It runs on from when the app opened,
+// so tests recorded live in a demo still come after the seeded ones.
+export const DEMO_CLOCK = '2026-10-01T08:30';
+const opened = Date.now();
+export const demoNow = () => new Date(new Date(DEMO_CLOCK).getTime() + Date.now() - opened);
+/** The clock Muscles uses: Sam's demo clock for Sam, so it matches Today and the leg day, the real one for others. */
+export const nowFor = (testerId: string) => (testerId === DEMO_TESTER ? demoNow() : new Date());
+
 /**
- * demo-sam's tests, timed from now so the Muscles tab always has colour: +21% two hours ago is Fatigued, ready in
- * about 40 h. Fixed dates went Ready as the real days passed. Still linked to the demo leg day for its summary.
+ * demo-sam's tests around the demo leg day (29 Sep, 6:10 to 7:08 pm). +21% after it is Fatigued on Sam's demo
+ * morning, ready in about 5 h.
  */
-export function demoSeed(now = Date.now()): MuscleTest[] {
+export function demoSeed(): MuscleTest[] {
   return [
-    { ...DEMO_BASE, id: 'demo-mt-1', when: 'before', recorded_at: hoursAgo(now, 3), env_mean: 0.42, env_slope_per_s: 0.004, vs_before_pct: null },
-    { ...DEMO_BASE, id: 'demo-mt-2', when: 'after', recorded_at: hoursAgo(now, 2), env_mean: 0.51, env_slope_per_s: 0.007, vs_before_pct: 21 },
+    { ...DEMO_BASE, id: 'demo-mt-1', when: 'before', recorded_at: '2026-09-29T17:55', env_mean: 0.42, env_slope_per_s: 0.004, vs_before_pct: null },
+    { ...DEMO_BASE, id: 'demo-mt-2', when: 'after', recorded_at: '2026-09-29T19:20', env_mean: 0.51, env_slope_per_s: 0.007, vs_before_pct: 21 },
   ];
 }
 
-/** A +8% next-morning test an hour ago, which turns the Muscles tab to Recovering. */
-export const demoMorning = (now = Date.now()): MuscleTest => ({
-  ...DEMO_BASE, id: 'demo-mt-3', when: 'next_morning', recorded_at: hoursAgo(now, 1), env_mean: 0.45,
-  env_slope_per_s: 0.005, vs_before_pct: 8,
+/** A +13% next-morning test, which turns the Muscles tab to Recovering (ready about 2 h after the demo clock). */
+export const demoMorning = (): MuscleTest => ({
+  ...DEMO_BASE, id: 'demo-mt-3', when: 'next_morning', recorded_at: '2026-09-30T07:50', env_mean: 0.47,
+  env_slope_per_s: 0.005, vs_before_pct: 13,
 });
 
 let tests: MuscleTest[] = demoSeed();
@@ -103,7 +111,7 @@ export const demoSource: MuscleTestSource = {
     const weak = demoSettings.weakSignal;
     return {
       id: `demo-mt-${Date.now().toString(36)}`, tester_id: testerId, workout_id: when === 'before' ? null : workoutId,
-      when, muscle: 'quads', side: 'left', recorded_at: localIso(new Date()), hold_seconds: HOLD_SECONDS, ...TEST_SETUP,
+      when, muscle: 'quads', side: 'left', recorded_at: localIso(nowFor(testerId)), hold_seconds: HOLD_SECONDS, ...TEST_SETUP,
       env_mean: 0.42 * (1 + (pct ?? 0) / 100), env_slope_per_s: 0.004, vs_before_pct: pct,
       quality_ok: !weak, quality_note: weak ? 'A flat trace with lots of noise.' : null, source: 'demo',
     };
