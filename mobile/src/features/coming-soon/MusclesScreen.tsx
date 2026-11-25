@@ -15,7 +15,7 @@ import { Panel } from '../../components/Panel';
 import { SectionHeader } from '../../components/SectionHeader';
 import { Text } from '../../components/Text';
 import { headingLevel } from '../../lib/a11y';
-import { muscleTestSource as source, setDemoRecovering } from '../../lib/muscleTestSource';
+import { muscleTestSource as source, nowFor, setDemoRecovering } from '../../lib/muscleTestSource';
 import { dayClockText, harderText, isDemo, readyText, recoveryOf, scheduleFor } from '../../lib/muscleTests';
 import { useSession } from '../../state/session';
 import { DemoNote, ScheduleRows } from '../muscles/parts';
@@ -57,7 +57,7 @@ export default function MusclesScreen() {
   // The newest test and the ones linked to the same workout. A before test on its own waits for its workout.
   const tests = latest.workout_id ? source.listForWorkout(userId, latest.workout_id) : [latest];
   const schedule = scheduleFor(tests);
-  const now = new Date();
+  const now = nowFor(userId);
   const r = recoveryOf(schedule, now);
   return (
     <Page>

@@ -32,6 +32,12 @@ def demo():
     }
 
 
+def test_demo_people_come_with_a_name_and_profile(demo):
+    assert client.get("/api/v1/users/demo-sam/today").json()["name"] == "Sam"
+    settings = client.get("/api/v1/users/demo-sam/profile").json()["settings"]
+    assert (settings["age"], settings["weight_kg"]) == (31, 72.0)
+
+
 def test_demo_today_shows_last_night(demo):
     t = client.get("/api/v1/users/demo-sam/today").json()
     assert t["now_local"] == "2026-10-01T08:30"
