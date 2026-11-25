@@ -31,6 +31,7 @@ from app.routers import (
     demo,
     health,
     imports,
+    muscle_tests,
     processing_runs,
     profile,
     readings,
@@ -40,6 +41,7 @@ from app.routers import (
     trends,
     workouts,
 )
+from app.services import muscle_tests as muscle_store
 from app.services import processing
 from app.services import sweat as sweat_store
 
@@ -59,6 +61,7 @@ for module in (
     checkins,
     workouts,
     sweat,
+    muscle_tests,
     processing_runs,
     demo,
 ):
@@ -74,3 +77,4 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 db.init_db()
 processing.init_db()
 sweat_store.init_db()
+muscle_store.init_db()

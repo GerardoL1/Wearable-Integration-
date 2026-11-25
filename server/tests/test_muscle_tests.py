@@ -7,18 +7,12 @@ Muscle tests from the USB sensor (Layer 2). Every signal here is made up in code
 import main
 import numpy as np
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.core import db
-from app.routers import muscle_tests as muscle_router
 from app.services import muscle_tests as mt
 
-# main.py doesn't include this router yet (that's the Layer 1 tab's file), so the tests mount it themselves.
-app = FastAPI(exception_handlers=main.app.exception_handlers)
-app.include_router(muscle_router.router)
-mt.init_db()
-client = TestClient(app)
+client = TestClient(main.app)
 
 
 def signal(rate=1000, seconds=35.0, rest=5.0, hold_s=30.0, rise=300.0, base=60.0, noise=8.0, slope=0.0, seed=1):
@@ -194,3 +188,20 @@ def test_unknown_person_and_test():
     assert client.post("/api/v1/users/nobody_here/muscle-tests", json=body("mt-x")).status_code == 404
     url = person("mt_missing")
     assert client.patch(f"{url}/not-a-test", json={"workout_id": None}).status_code == 404
+
+
+def test_reloading_a_demo_person_clears_their_muscle_tests():
+    assert client.post("/api/v1/demo-users/jordan").status_code == 200
+    url = "/api/v1/users/demo-jordan/muscle-tests"
+    assert client.post(url, json=body("mt-demo")).status_code == 200
+    assert client.post("/api/v1/demo-users/jordan").status_code == 200
+    assert client.get(url).json() == []
+    with db.connect() as conn:
+        assert conn.execute("SELECT 1 FROM muscle_test_samples WHERE test_id = 'mt-demo'").fetchone() is None
+
+
+def test_an_upload_over_the_size_limit_gets_a_413():
+    r = client.post(
+        person("mt_big"), content=b"{" + b" " * (4 * 1024 * 1024) + b"}", headers={"Content-Type": "application/json"}
+    )
+    assert r.status_code == 413

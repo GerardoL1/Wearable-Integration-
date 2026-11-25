@@ -38,6 +38,8 @@ def test_the_real_limits():
         USER + "/workouts/{workout_id}/sweat",
         USER + "/sweat/nix/preview",
         USER + "/sweat/nix",
+        USER + "/muscle-tests",
+        USER + "/muscle-tests/{test_id}",
     }
     assert limits.limit_for("/api/v1/users/sam/imports") == (USER + "/imports", limits.MAX_EXPORT_UPLOAD_BYTES)
     assert limits.limit_for("/api/v1/users/sam/readings/shortcuts") == (

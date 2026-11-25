@@ -23,6 +23,11 @@ def load_demo(person: Literal["sam", "alex", "jordan"]):
     """Load a mock person as demo-<name> with a fixed clock. Reloading starts them fresh."""
     user_id = f"demo-{person}"
     with db.connect() as conn:
+        # The raw samples are kept by test id, so they go before the tests that point to them.
+        conn.execute(
+            "DELETE FROM muscle_test_samples WHERE test_id IN (SELECT id FROM muscle_tests WHERE user_id = ?)",
+            (user_id,),
+        )
         for table in (
             "samples",
             "sleep_stages",
@@ -34,6 +39,7 @@ def load_demo(person: Literal["sam", "alex", "jordan"]):
             "workouts",
             "sweat_sessions",
             "sweat_minutes",
+            "muscle_tests",
             "users",
         ):
             conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))

@@ -430,6 +430,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/{user_id}/muscle-tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Muscle Tests */
+        get: operations["list_muscle_tests_api_v1_users__user_id__muscle_tests_get"];
+        put?: never;
+        /**
+         * Upload Muscle Test
+         * @description Stores the raw samples and the result, good or not. quality_ok and quality_note say which.
+         */
+        post: operations["upload_muscle_test_api_v1_users__user_id__muscle_tests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}/muscle-tests/{test_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change Muscle Test */
+        patch: operations["change_muscle_test_api_v1_users__user_id__muscle_tests__test_id__patch"];
+        trace?: never;
+    };
     "/api/v1/users/{user_id}/processing-runs": {
         parameters: {
             query?: never;
@@ -728,6 +766,108 @@ export interface components {
             survey_version: string;
             answers: components["schemas"]["MorningAnswers"];
         };
+        /**
+         * MuscleTest
+         * @description Same shape as MuscleTest in mobile/src/lib/muscleTests.ts, plus what the sensor check needs.
+         */
+        MuscleTest: {
+            /** Id */
+            id: string;
+            /** Tester Id */
+            tester_id: string;
+            /** Workout Id */
+            workout_id: string | null;
+            /**
+             * When
+             * @enum {string}
+             */
+            when: "before" | "after" | "next_morning";
+            /** Muscle */
+            muscle: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "left" | "right";
+            /** Recorded At */
+            recorded_at: string;
+            /** Hold Seconds */
+            hold_seconds: number;
+            /** Load */
+            load: string;
+            /** Position */
+            position: string;
+            /** Patch Spot */
+            patch_spot: string;
+            /** Device */
+            device: string;
+            /** Gain Note */
+            gain_note: string | null;
+            /** Env Mean */
+            env_mean: number;
+            /** Env Slope Per S */
+            env_slope_per_s: number;
+            /** Vs Before Pct */
+            vs_before_pct: number | null;
+            /** Quality Ok */
+            quality_ok: boolean;
+            /** Quality Note */
+            quality_note: string | null;
+            /**
+             * Source
+             * @default device
+             * @constant
+             */
+            source: "device";
+            planned: components["schemas"]["Planned"] | null;
+            stats: components["schemas"]["SignalStats"];
+        };
+        /**
+         * MuscleTestChange
+         * @description Only the fields sent are changed. Send null to clear one.
+         */
+        MuscleTestChange: {
+            /** Workout Id */
+            workout_id?: string | null;
+            planned?: components["schemas"]["Planned"] | null;
+        };
+        /** MuscleTestUpload */
+        MuscleTestUpload: {
+            /** Id */
+            id: string;
+            /**
+             * When
+             * @enum {string}
+             */
+            when: "before" | "after" | "next_morning";
+            /** Muscle */
+            muscle: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "left" | "right";
+            /** Recorded At */
+            recorded_at: string;
+            /** Load */
+            load: string;
+            /** Position */
+            position: string;
+            /** Patch Spot */
+            patch_spot: string;
+            /** Device */
+            device: string;
+            /** Gain Note */
+            gain_note?: string | null;
+            /** Workout Id */
+            workout_id?: string | null;
+            /** Before Test Id */
+            before_test_id?: string | null;
+            /** Time Us */
+            time_us: number[];
+            /** Adc */
+            adc: number[];
+        };
         /** NixPreview */
         NixPreview: {
             session: components["schemas"]["SweatSession"];
@@ -742,6 +882,13 @@ export interface components {
             moves_from_workout: components["schemas"]["Workout"] | null;
             /** Weight Suggestion Kg */
             weight_suggestion_kg: number | null;
+        };
+        /** Planned */
+        Planned: {
+            /** Name */
+            name: string;
+            /** Date */
+            date: string;
         };
         /** ProcessingRun */
         ProcessingRun: {
@@ -893,6 +1040,25 @@ export interface components {
             weight_kg?: number | null;
             /** Name */
             name?: string | null;
+        };
+        /** SignalStats */
+        SignalStats: {
+            /** Sample Rate Hz */
+            sample_rate_hz: number;
+            /** Gap Share */
+            gap_share: number;
+            /** Clip Share */
+            clip_share: number;
+            /** Adc Min */
+            adc_min: number;
+            /** Adc Max */
+            adc_max: number;
+            /** Baseline Adc */
+            baseline_adc: number;
+            /** Hold Start S */
+            hold_start_s: number | null;
+            /** Hold End S */
+            hold_end_s: number | null;
         };
         /** SleepBlock */
         SleepBlock: {
@@ -2083,6 +2249,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SweatDaily"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_muscle_tests_api_v1_users__user_id__muscle_tests_get: {
+        parameters: {
+            query?: {
+                workout_id?: string | null;
+            };
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MuscleTest"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_muscle_test_api_v1_users__user_id__muscle_tests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MuscleTestUpload"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MuscleTest"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_muscle_test_api_v1_users__user_id__muscle_tests__test_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                test_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MuscleTestChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MuscleTest"];
                 };
             };
             /** @description Validation Error */
