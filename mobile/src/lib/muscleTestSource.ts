@@ -43,23 +43,42 @@ export const demoSettings = { weakSignal: false };
 export const TEST_MS = (REST_SECONDS + HOLD_SECONDS) * 1000;
 const SAMPLE_MS = 20; // 50 a second, enough to draw
 
-function seed(): MuscleTest[] {
-  const base = { tester_id: 'demo-sam', workout_id: 'demo-legs-0929', muscle: 'quads', side: 'left' as const,
-    hold_seconds: HOLD_SECONDS, ...TEST_SETUP, quality_ok: true, quality_note: null, source: 'demo' as const };
+const hoursAgo = (now: number, h: number) => localIso(new Date(now - h * 3600_000));
+const DEMO_BASE = { tester_id: 'demo-sam', workout_id: 'demo-legs-0929', muscle: 'quads', side: 'left' as const,
+  hold_seconds: HOLD_SECONDS, ...TEST_SETUP, quality_ok: true, quality_note: null, source: 'demo' as const };
+
+/**
+ * demo-sam's tests, timed from now so the Muscles tab always has colour: +21% two hours ago is Fatigued, ready in
+ * about 40 h. Fixed dates went Ready as the real days passed. Still linked to the demo leg day for its summary.
+ */
+export function demoSeed(now = Date.now()): MuscleTest[] {
   return [
-    { ...base, id: 'demo-mt-1', when: 'before', recorded_at: '2026-09-29T18:05', env_mean: 0.42, env_slope_per_s: 0.004, vs_before_pct: null },
-    { ...base, id: 'demo-mt-2', when: 'after', recorded_at: '2026-09-29T19:15', env_mean: 0.51, env_slope_per_s: 0.007, vs_before_pct: 21 },
-    { ...base, id: 'demo-mt-3', when: 'next_morning', recorded_at: '2026-09-30T07:50', env_mean: 0.45, env_slope_per_s: 0.005, vs_before_pct: 8 },
+    { ...DEMO_BASE, id: 'demo-mt-1', when: 'before', recorded_at: hoursAgo(now, 3), env_mean: 0.42, env_slope_per_s: 0.004, vs_before_pct: null },
+    { ...DEMO_BASE, id: 'demo-mt-2', when: 'after', recorded_at: hoursAgo(now, 2), env_mean: 0.51, env_slope_per_s: 0.007, vs_before_pct: 21 },
   ];
 }
 
-let tests: MuscleTest[] = seed();
+/** A +8% next-morning test an hour ago, which turns the Muscles tab to Recovering. */
+export const demoMorning = (now = Date.now()): MuscleTest => ({
+  ...DEMO_BASE, id: 'demo-mt-3', when: 'next_morning', recorded_at: hoursAgo(now, 1), env_mean: 0.45,
+  env_slope_per_s: 0.005, vs_before_pct: 8,
+});
+
+let tests: MuscleTest[] = demoSeed();
 let version = 0;
 const listeners = new Set<() => void>();
 const changed = () => {
   version += 1;
   listeners.forEach((l) => l());
 };
+
+/** Demo only: "?recovering=1" on the Muscles tab adds the next-morning test so testers can see Recovering. */
+export function setDemoRecovering(on: boolean) {
+  const has = tests.some((t) => t.id === 'demo-mt-3');
+  if (on === has) return;
+  tests = on ? [...tests, demoMorning()] : tests.filter((t) => t.id !== 'demo-mt-3');
+  changed();
+}
 
 export const demoSource: MuscleTestSource = {
   kind: 'demo',

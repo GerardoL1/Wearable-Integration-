@@ -65,7 +65,16 @@ const checks = {
     ms.demoSettings.weakSignal = false;
     assert.strictEqual(mt.isDemo([after]), true);
     assert.strictEqual(mt.isDemo([{ ...after, source: 'device' }, undefined]), false);
-    assert.strictEqual(ms.demoSource.listForWorkout('demo-sam', 'demo-legs-0929').length, 3);
+    assert.strictEqual(ms.demoSource.listForWorkout('demo-sam', 'demo-legs-0929').length, 2);
+  },
+  'the demo seed is timed from now, so Muscles shows Fatigued, or Recovering with the morning test': () => {
+    const now = new Date(2027, 2, 10, 12, 0).getTime();
+    const seeded = ms.demoSeed(now);
+    assert.deepStrictEqual(seeded.map((t) => t.recorded_at), ['2027-03-10T09:00', '2027-03-10T10:00']);
+    let r = mt.recoveryOf(mt.scheduleFor(seeded), new Date(now));
+    assert.deepStrictEqual([r.level, mt.readyText(r, new Date(now))], ['fatigued', 'Ready in ~40 h']);
+    r = mt.recoveryOf(mt.scheduleFor([...seeded, ms.demoMorning(now)]), new Date(now));
+    assert.strictEqual(r.level, 'recovering');
   },
   'USB lines split across chunks, notes and junk are read right': () => {
     const p = us.newParser();

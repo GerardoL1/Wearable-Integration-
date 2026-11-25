@@ -3,7 +3,8 @@
  * "No muscle tests yet.". Recovery follows a placeholder rule (lib/muscleTests.ts recoveryOf) until the model
  * exists. Untested muscles need logged exercises, so they show as not tested. Figma "Muscles".
  */
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { BodyMap } from '../../components/BodyMap';
@@ -14,7 +15,7 @@ import { Panel } from '../../components/Panel';
 import { SectionHeader } from '../../components/SectionHeader';
 import { Text } from '../../components/Text';
 import { headingLevel } from '../../lib/a11y';
-import { muscleTestSource as source } from '../../lib/muscleTestSource';
+import { muscleTestSource as source, setDemoRecovering } from '../../lib/muscleTestSource';
 import { dayClockText, harderText, isDemo, readyText, recoveryOf, scheduleFor } from '../../lib/muscleTests';
 import { useSession } from '../../state/session';
 import { DemoNote, ScheduleRows } from '../muscles/parts';
@@ -29,6 +30,8 @@ const LEVEL = { fatigued: 'Fatigued', recovering: 'Recovering', ready: 'Ready' }
 export default function MusclesScreen() {
   const { userId } = useSession();
   useMuscleTestsVersion();
+  const { recovering } = useLocalSearchParams<{ recovering?: string }>();
+  useEffect(() => setDemoRecovering(recovering === '1'), [recovering]);
   const latest = source.listRecent(userId)[0];
   const start = () => router.push('/muscles/setup');
 
