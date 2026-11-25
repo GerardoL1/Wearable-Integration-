@@ -101,6 +101,10 @@ export default function GalleryScreen() {
         <View style={styles.summary}>
           <BodyMap sore={sore} onToggle={(m) => setSore((s) => toggleMuscle(s, m))} />
         </View>
+        <View style={styles.gap}><SectionHeader title="Body map, recovery" /></View>
+        <View style={styles.summary}>
+          <BodyMap levels={{ quads: 'fatigued', hamstrings: 'recovering', glutes: 'ready' }} />
+        </View>
 
         <View style={styles.gap}><SectionHeader title="Buttons" /></View>
         <View style={styles.buttons}>

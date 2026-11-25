@@ -36,9 +36,11 @@ export default function MusclesScreen() {
   const start = () => router.push('/muscles/setup');
 
   if (!latest) {
+    // The map comes first even before any test, so the tab shows what it's for. Every muscle reads as not trained.
     return (
       <Page>
         <Text variant="h1" accessibilityRole="header">Muscles</Text>
+        <View style={styles.section}><BodyMap levels={{}} /></View>
         <Text variant="greeting" accessibilityRole="header" {...headingLevel(2)} style={styles.title}>
           No muscle tests yet.
         </Text>
