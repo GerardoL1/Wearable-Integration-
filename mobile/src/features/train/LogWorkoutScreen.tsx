@@ -25,6 +25,7 @@ import { errorText } from '../../lib/useLoad';
 import { useSession } from '../../state/session';
 import { useTheme } from '../../theme/theme';
 import { radius, type } from '../../theme/tokens';
+import { useMuscleTestsVersion } from '../muscles/useMuscleTests';
 import { DateTimeField } from './DateTimeField';
 
 const AFTER_SAVE = [
@@ -60,6 +61,7 @@ export default function LogWorkoutScreen() {
   const api = useApi();
   const { isWide } = useTheme();
   const { userId } = useSession();
+  useMuscleTestsVersion();
   // A plan from today's before test fills in what and when. Only the times are left after training.
   const [form, setForm] = useState<WorkoutForm>(() => {
     const today = dateValue(new Date());
@@ -101,7 +103,7 @@ export default function LogWorkoutScreen() {
     setSaveError(null);
     try {
       const w = await api.saveWorkout(workoutBody(form, id));
-      if (chosen) muscleTestSource.link(chosen.id, w.id);
+      if (chosen) await muscleTestSource.link(chosen.id, w.id);
       // Replaced, so Back from the summary goes to Train rather than to this form.
       router.replace({ pathname: '/train/workout/[workoutId]', params: { workoutId: w.id } });
     } catch (e) {

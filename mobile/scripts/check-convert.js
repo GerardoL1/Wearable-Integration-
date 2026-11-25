@@ -33,6 +33,7 @@ const lw = load('lib', 'logWorkout.ts');
 const mt = load('lib', 'muscleTests.ts');
 const ms = load('lib', 'muscleTestSource.ts');
 const ci = load('lib', 'checkin.ts');
+const us = load('lib', 'usbSerial.ts');
 
 const checks = {
   'muscle tests land in the right schedule slot': () => {
@@ -64,7 +65,42 @@ const checks = {
     ms.demoSettings.weakSignal = false;
     assert.strictEqual(mt.isDemo([after]), true);
     assert.strictEqual(mt.isDemo([{ ...after, source: 'device' }, undefined]), false);
-    assert.strictEqual(ms.demoSource.listForWorkout('demo-sam', 'demo-legs-0929').length, 3);
+    assert.strictEqual(ms.demoSource.listForWorkout('demo-sam', 'demo-legs-0929').length, 2);
+  },
+  'the demo seed is timed from now, so Muscles shows Fatigued, or Recovering with the morning test': () => {
+    const now = new Date(2027, 2, 10, 12, 0).getTime();
+    const seeded = ms.demoSeed(now);
+    assert.deepStrictEqual(seeded.map((t) => t.recorded_at), ['2027-03-10T09:00', '2027-03-10T10:00']);
+    let r = mt.recoveryOf(mt.scheduleFor(seeded), new Date(now));
+    assert.deepStrictEqual([r.level, mt.readyText(r, new Date(now))], ['fatigued', 'Ready in ~40 h']);
+    r = mt.recoveryOf(mt.scheduleFor([...seeded, ms.demoMorning(now)]), new Date(now));
+    assert.strictEqual(r.level, 'recovering');
+  },
+  'USB lines split across chunks, notes and junk are read right': () => {
+    const p = us.newParser();
+    let r = us.feed(p, 'garbage from the bootloader\n#ready\n1000,12');
+    assert.deepStrictEqual([r.samples, r.ready, p.malformed], [[], true, 1]);
+    r = us.feed(p, '\r\n2000,1023\n3000,1024\n1500,5\n4000,x\n,\n\n5000,7\n');
+    assert.deepStrictEqual(r.samples, [{ t_us: 1000, adc: 12 }, { t_us: 2000, adc: 1023 }, { t_us: 5000, adc: 7 }]);
+    assert.strictEqual(p.malformed, 5); // 1024 too high, 1500 backwards, x, a lone comma, plus the bootloader line
+    us.feed(p, '1'.repeat(80)); // a line that never ends is dropped
+    assert.strictEqual(p.malformed, 6);
+  },
+  'the Arduino clock rolling over keeps counting up': () => {
+    const p = us.newParser();
+    const r = us.feed(p, '4294966000,1\n4294967000,2\n704,3\n');
+    assert.deepStrictEqual(r.samples.map((s) => s.t_us), [4294966000, 4294967000, 4294967296 + 704]);
+  },
+  'USB stats count rate, gaps and clipping': () => {
+    const st = us.newStats();
+    const samples = [];
+    for (let i = 0; i < 2000; i += 1) samples.push({ t_us: i * 1000 + (i >= 1500 ? 5000 : 0), adc: i === 10 ? 1021 : 300 });
+    us.addSamples(st, samples);
+    assert.deepStrictEqual([st.count, st.gaps, st.clipped, st.min, st.max, st.current], [2000, 1, 1, 300, 1021, 300]);
+    assert.ok(Math.abs(st.rate_hz - 995) < 10, st.rate_hz);
+    assert.strictEqual(us.signalQuality(st), 'Good');
+    assert.strictEqual(us.signalQuality({ ...st, rate_hz: 600 }), 'Poor');
+    assert.strictEqual(us.toCsv(samples.slice(0, 2)), 'time_us,adc\n0,300\n1000,300\n');
   },
   'Log a workout offers the unlinked before tests of its date': () => {
     const b = (id, at, workout_id = null) => ({ id, when: 'before', recorded_at: at, workout_id });

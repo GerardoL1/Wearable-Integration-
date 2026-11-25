@@ -1374,6 +1374,181 @@
         }
       }
     },
+    "/api/v1/users/{user_id}/muscle-tests": {
+      "post": {
+        "tags": [
+          "muscle tests"
+        ],
+        "summary": "Upload Muscle Test",
+        "description": "Stores the raw samples and the result, good or not. quality_ok and quality_note say which.",
+        "operationId": "upload_muscle_test_api_v1_users__user_id__muscle_tests_post",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MuscleTestUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MuscleTest"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "muscle tests"
+        ],
+        "summary": "List Muscle Tests",
+        "operationId": "list_muscle_tests_api_v1_users__user_id__muscle_tests_get",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "workout_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workout Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MuscleTest"
+                  },
+                  "title": "Response List Muscle Tests Api V1 Users  User Id  Muscle Tests Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{user_id}/muscle-tests/{test_id}": {
+      "patch": {
+        "tags": [
+          "muscle tests"
+        ],
+        "summary": "Change Muscle Test",
+        "operationId": "change_muscle_test_api_v1_users__user_id__muscle_tests__test_id__patch",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "test_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Test Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MuscleTestChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MuscleTest"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/{user_id}/processing-runs": {
       "post": {
         "tags": [
@@ -2299,6 +2474,320 @@
         ],
         "title": "MorningCheckinIn"
       },
+      "MuscleTest": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "tester_id": {
+            "type": "string",
+            "title": "Tester Id"
+          },
+          "workout_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workout Id"
+          },
+          "when": {
+            "type": "string",
+            "enum": [
+              "before",
+              "after",
+              "next_morning"
+            ],
+            "title": "When"
+          },
+          "muscle": {
+            "type": "string",
+            "title": "Muscle"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right"
+            ],
+            "title": "Side"
+          },
+          "recorded_at": {
+            "type": "string",
+            "title": "Recorded At"
+          },
+          "hold_seconds": {
+            "type": "number",
+            "title": "Hold Seconds"
+          },
+          "load": {
+            "type": "string",
+            "title": "Load"
+          },
+          "position": {
+            "type": "string",
+            "title": "Position"
+          },
+          "patch_spot": {
+            "type": "string",
+            "title": "Patch Spot"
+          },
+          "device": {
+            "type": "string",
+            "title": "Device"
+          },
+          "gain_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gain Note"
+          },
+          "env_mean": {
+            "type": "number",
+            "title": "Env Mean"
+          },
+          "env_slope_per_s": {
+            "type": "number",
+            "title": "Env Slope Per S"
+          },
+          "vs_before_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vs Before Pct"
+          },
+          "quality_ok": {
+            "type": "boolean",
+            "title": "Quality Ok"
+          },
+          "quality_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Note"
+          },
+          "source": {
+            "type": "string",
+            "const": "device",
+            "title": "Source",
+            "default": "device"
+          },
+          "planned": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Planned"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stats": {
+            "$ref": "#/components/schemas/SignalStats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tester_id",
+          "workout_id",
+          "when",
+          "muscle",
+          "side",
+          "recorded_at",
+          "hold_seconds",
+          "load",
+          "position",
+          "patch_spot",
+          "device",
+          "gain_note",
+          "env_mean",
+          "env_slope_per_s",
+          "vs_before_pct",
+          "quality_ok",
+          "quality_note",
+          "planned",
+          "stats"
+        ],
+        "title": "MuscleTest",
+        "description": "Same shape as MuscleTest in mobile/src/lib/muscleTests.ts, plus what the sensor check needs."
+      },
+      "MuscleTestChange": {
+        "properties": {
+          "workout_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.:-]{1,80}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workout Id"
+          },
+          "planned": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Planned"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MuscleTestChange",
+        "description": "Only the fields sent are changed. Send null to clear one."
+      },
+      "MuscleTestUpload": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.:-]{1,80}$",
+            "title": "Id"
+          },
+          "when": {
+            "type": "string",
+            "enum": [
+              "before",
+              "after",
+              "next_morning"
+            ],
+            "title": "When"
+          },
+          "muscle": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Muscle"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right"
+            ],
+            "title": "Side"
+          },
+          "recorded_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$",
+            "title": "Recorded At"
+          },
+          "load": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Load"
+          },
+          "position": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Position"
+          },
+          "patch_spot": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Patch Spot"
+          },
+          "device": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Device"
+          },
+          "gain_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gain Note"
+          },
+          "workout_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.:-]{1,80}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workout Id"
+          },
+          "before_test_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.:-]{1,80}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Test Id"
+          },
+          "time_us": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Time Us"
+          },
+          "adc": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Adc"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "when",
+          "muscle",
+          "side",
+          "recorded_at",
+          "load",
+          "position",
+          "patch_spot",
+          "device",
+          "time_us",
+          "adc"
+        ],
+        "title": "MuscleTestUpload"
+      },
       "NixPreview": {
         "properties": {
           "session": {
@@ -2365,6 +2854,28 @@
           "weight_suggestion_kg"
         ],
         "title": "NixPreview"
+      },
+      "Planned": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "title": "Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "date"
+        ],
+        "title": "Planned"
       },
       "ProcessingRun": {
         "properties": {
@@ -2927,6 +3438,68 @@
         "type": "object",
         "title": "SettingsUpdate",
         "description": "Only the fields sent are changed."
+      },
+      "SignalStats": {
+        "properties": {
+          "sample_rate_hz": {
+            "type": "number",
+            "title": "Sample Rate Hz"
+          },
+          "gap_share": {
+            "type": "number",
+            "title": "Gap Share"
+          },
+          "clip_share": {
+            "type": "number",
+            "title": "Clip Share"
+          },
+          "adc_min": {
+            "type": "integer",
+            "title": "Adc Min"
+          },
+          "adc_max": {
+            "type": "integer",
+            "title": "Adc Max"
+          },
+          "baseline_adc": {
+            "type": "number",
+            "title": "Baseline Adc"
+          },
+          "hold_start_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Start S"
+          },
+          "hold_end_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold End S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sample_rate_hz",
+          "gap_share",
+          "clip_share",
+          "adc_min",
+          "adc_max",
+          "baseline_adc",
+          "hold_start_s",
+          "hold_end_s"
+        ],
+        "title": "SignalStats"
       },
       "SleepBlock": {
         "properties": {

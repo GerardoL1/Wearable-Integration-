@@ -8,11 +8,13 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Button } from '../../components/Button';
+import { LiveText } from '../../components/LiveText';
 import { Notice } from '../../components/Notice';
 import { SectionHeader } from '../../components/SectionHeader';
 import { Text } from '../../components/Text';
 import { muscleTestSource as source } from '../../lib/muscleTestSource';
 import { isDemo, linkableBefore, pctText, scheduleFor, TestWhen } from '../../lib/muscleTests';
+import { errorText } from '../../lib/useLoad';
 import { useSession } from '../../state/session';
 import { useTheme } from '../../theme/theme';
 import { DemoNote, ScheduleRows } from './parts';
@@ -23,6 +25,7 @@ export function WorkoutMuscleTests({ workoutId, startLocal }: { workoutId: strin
   const { isWide } = useTheme();
   useMuscleTestsVersion();
   const [problem, setProblem] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const tests = source.listForWorkout(userId, workoutId);
   const open = (when: TestWhen) => router.push({ pathname: '/muscles/test', params: { when, workoutId } });
   // Full width on iPhone, as wide as its words on the computer.
@@ -30,11 +33,15 @@ export function WorkoutMuscleTests({ workoutId, startLocal }: { workoutId: strin
   const header = <SectionHeader title="Muscle tests" note="Muscle test" />;
 
   if (!tests.length) {
-    function add() {
+    async function add() {
       const before = linkableBefore(source.listRecent(userId), startLocal)[0];
       if (!before) return setProblem(true);
-      source.link(before.id, workoutId);
-      open('after');
+      try {
+        await source.link(before.id, workoutId);
+        open('after');
+      } catch (e) {
+        setLinkError(`Couldn't link the before test. ${errorText(e)}`);
+      }
     }
     return (
       <View style={styles.section}>
@@ -50,6 +57,7 @@ export function WorkoutMuscleTests({ workoutId, startLocal }: { workoutId: strin
               Test your quads before and after training to see how tired they got.
             </Text>
             <Button title="Add muscle tests" kind="secondary" style={buttonStyle} onPress={add} />
+            {linkError ? <LiveText error variant="bodySmall" color="low" style={styles.note}>{linkError}</LiveText> : null}
           </>
         )}
       </View>

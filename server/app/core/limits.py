@@ -23,6 +23,9 @@ MAX_SMALL_JSON_BYTES = 64 * 1024
 # A Nix workout export (.xlsx) is about 160 KB, so this leaves plenty of room.
 MAX_NIX_UPLOAD_BYTES = 5 * MB
 
+# One muscle test from the USB sensor: up to 60 s at 1000 samples a second is about 1 MB of JSON.
+MAX_MUSCLE_TEST_BYTES = 3 * MB
+
 # Total unzipped size of everything inside an export zip. Checked from the zip's own listing
 # before anything is read, so a zip that would unpack to something enormous is refused early.
 MAX_UNZIPPED_BYTES = 4 * GB
@@ -39,6 +42,8 @@ LIMITS_BY_PATH = {
     USER + "/workouts": MAX_SMALL_JSON_BYTES,
     USER + "/workouts/{workout_id}/rating": MAX_SMALL_JSON_BYTES,
     USER + "/workouts/{workout_id}/sweat": MAX_SMALL_JSON_BYTES,
+    USER + "/muscle-tests": MAX_MUSCLE_TEST_BYTES,
+    USER + "/muscle-tests/{test_id}": MAX_SMALL_JSON_BYTES,
     USER + "/sweat/nix/preview": MAX_NIX_UPLOAD_BYTES,
     USER + "/sweat/nix": MAX_NIX_UPLOAD_BYTES,
 }
