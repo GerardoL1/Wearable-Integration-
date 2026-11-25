@@ -13,6 +13,7 @@ The datasets themselves never go in the repo. build_public_training_table.py rea
     Fatigue study      Fitbit, 207 people, USA, "tired yesterday" 0-4              Zenodo 8018238
     Finnish immigrants Oura, 39 people, Finland, RMSSD, dates shifted for privacy  Dryad qz612jmrn
     UC Irvine students Oura gen 1, 21 people, California, RMSSD + PANAS            Dryad D1WH6T
+    HRV cyclists       mixed devices, 24 men, Spain, morning RMSSD + wellness 1-7  OSF w6bzq
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ import json
 import re
 import xml.etree.ElementTree as ET
 import zipfile
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -574,3 +575,95 @@ def uci_students(outer_zip: Path) -> pd.DataFrame:
     extra = ["oura_readiness_score", "uci_panas_positive", "uci_panas_negative", "uci_active", "uci_alert",
              "uci_strong"]  # fmt: skip
     return _finish(t, extra, "uci_students", "Oura ring (gen 1)", "RMSSD", UCI_TZ)
+
+
+# HRV-guided cyclists (Alfonso et al. 2025, Sci Rep 15:34023, OSF w6bzq, Spain) -----------------------------------
+
+# From Screening_Data.pdf, which only exists as a PDF: ID -> (age, height cm, weight kg before, HRV source).
+# All participants are men. Four of these IDs have no rows in Daily_Data.xlsx.
+CYCLIST_SCREENING = {
+    2: (41, 180, 72, "Oura"), 3: (41, 180, 72, "Oura"), 4: (30, 184, 67, "HRV4Training"),
+    5: (29, 171, 63, "HRV4Training"), 7: (55, 155, 88.5, "Oura"), 8: (53, 173, 62, "Whoop"),
+    9: (31, 178, 68, "EliteHRV"), 10: (37, 182, 77, "EliteHRV"), 11: (39, 189, 76, "Oura"),
+    12: (27, 186, 74, "Oura"), 13: (27, 186, 75.6, "Oura"), 14: (39, 186, 69.2, "Oura"),
+    15: (40, 166, 61.3, "EliteHRV"), 16: (42, 167, 60, "Oura"), 17: (43, 194, 84, "Oura"),
+    18: (45, 180, 86, "Oura"), 19: (66, 180, 81, "HRV4Training"), 20: (66, 180, 83, "HRV4Training"),
+    22: (69, 185.4, 86, "HRV4Training"), 23: (69, 185.4, 86, "HRV4Training"), 28: (55, 186, 104, "HRV4Training"),
+    29: (37, 176, 85, "HRV4Training"), 30: (56, 183, 85, "HRV4Training"), 31: (39, 180, 76, "Oura"),
+    32: (65, 188, 75, "HRV4Training"), 33: (51, 179, 88.3, "HRV4Training"), 35: (38, 171, 69, "HRV4Training"),
+    36: (55, 187, 82.8, "HRV4Training"),
+}  # fmt: skip
+CYCLIST_ITEMS = ["SleepQuality", "DOMS", "Fatigue", "Stress", "Wellbeing"]
+CYCLIST_DAYS = 40
+# The study only numbers its days, so nights get stand-in dates from here. Weekday and season mean nothing.
+CYCLIST_DAY_ZERO = date(2000, 1, 1)
+
+
+def _cyclist_training(rows: list[dict]) -> dict[str, dict[int, str | None]]:
+    """Daily_Training.xlsx is sideways: one column per person and one row per day. Days 1 to 9 were baseline."""
+    ids = {col: (pid or "").strip() for col, pid in rows[0].items() if col != "A"}
+    plan: dict[str, dict[int, str | None]] = {}
+    for r in rows:
+        label = (r.get("A") or "").strip()
+        if label.startswith("Day "):
+            day = int(label.split()[1])
+            for col, pid in ids.items():
+                plan.setdefault(pid, {})[day] = (r.get(col) or "").strip() or None
+    return plan
+
+
+def cyclists(folder: Path) -> pd.DataFrame:
+    """
+    Morning RMSSD, resting HR and a 4-item wellness check (1 to 7) on the same morning, for 40 days.
+    Oura and Whoop give an overnight value, HRV4Training and Elite HRV a short reading on waking.
+    There's no sleep window, so each morning reading counts as usable on its own. A reading on the morning
+    of day N describes the night of day N-1, and that row carries day N-1's training (High, Low or Rest).
+    Wellbeing is sleep quality minus soreness, fatigue and stress, as the study defines it.
+    """
+    rows = read_xlsx_rows(folder / "Daily_Data.xlsx")
+    head = rows[0]
+    daily = pd.DataFrame(
+        [{head[k]: v for k, v in r.items() if k in head} for r in rows[1:] if (r.get("A") or "").strip()]
+    )
+    plan = _cyclist_training(read_xlsx_rows(folder / "Daily_Training.xlsx"))
+    days = [f"Day {i}" for i in range(1, CYCLIST_DAYS + 1)]
+    parts = []
+    for pid, g in daily.groupby("ID", sort=False):
+        pid = str(pid).strip()
+        v = g.set_index("Variable")[days].apply(pd.to_numeric, errors="coerce")
+
+        def row(name, v=v):
+            return v.loc[name] if name in v.index else pd.Series(np.nan, index=days)
+
+        n = pd.DataFrame({"night_date": [CYCLIST_DAY_ZERO + timedelta(days=i) for i in range(CYCLIST_DAYS)]})
+        n["hrv_night_ms"] = _in_range(row("HRV"), "hrv_sdnn")
+        n["hrv_ln"] = np.log(n["hrv_night_ms"])
+        n["hrv_count"] = n["hrv_night_ms"].notna().astype(int)
+        n["rhr_night_bpm"] = _in_range(row("RHR"), "heart_rate")
+        for col in ("tst_min", "sleep_efficiency_pct", "fragmentation_per_hr", "waso_min", "sleep_latency_min"):
+            n[col] = np.nan
+        n["usable_sleep"] = False
+        n["usable_hrv"] = n["hrv_night_ms"].notna()
+        n["usable_rhr"] = n["rhr_night_bpm"].notna()
+        n = add_baselines(n)
+        n["night_date"] = n["night_date"].astype(str)
+        n.insert(0, "person_id", f"cyclist_{pid}")
+        for item in CYCLIST_ITEMS:
+            n[f"cyclist_{item.lower()}"] = row(item).to_numpy()
+        n["cyclist_training_prev_day"] = [plan.get(pid, {}).get(day) for day in range(CYCLIST_DAYS)]
+        s = CYCLIST_SCREENING.get(int(pid))
+        n["age"] = s[0] if s else np.nan
+        n["age_band"] = None if not s else ("<30" if s[0] < 30 else ">=30")
+        n["gender"] = "MALE"
+        n["bmi_band"] = f"{s[2] / (s[1] / 100) ** 2:.0f}" if s else None
+        n["hrv_source"] = s[3] if s else None
+        parts.append(n)
+    t = pd.concat(parts, ignore_index=True)
+    t["label_source"] = "cyclist_wellbeing"
+    extra = [
+        *[f"cyclist_{i.lower()}" for i in CYCLIST_ITEMS],
+        "cyclist_training_prev_day",
+        "hrv_source",
+        "label_source",
+    ]
+    return _finish(t, extra, "hrv_cyclists", "mixed (Oura, Whoop, HRV4Training, Elite HRV)", "RMSSD", "no dates")

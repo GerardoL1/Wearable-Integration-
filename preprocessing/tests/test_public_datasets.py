@@ -80,6 +80,48 @@ def test_summary_nights_treat_zero_as_missing_and_never_score_tonight_into_its_b
     assert n["z_hrv"].iloc[9] > 2
 
 
+def write_xlsx(path, rows):
+    """A one-sheet .xlsx from a list of rows (lists of text), with every cell stored as plain text."""
+    letters = lambda i: "" if i < 0 else letters(i // 26 - 1) + chr(65 + i % 26)  # noqa: E731
+    body = "".join(
+        f'<row r="{r + 1}">'
+        + "".join(f'<c r="{letters(c)}{r + 1}" t="str"><v>{v}</v></c>' for c, v in enumerate(row) if v != "")
+        + "</row>"
+        for r, row in enumerate(rows)
+    )
+    sheet = f'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>{body}</sheetData></worksheet>'
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("xl/worksheets/sheet1.xml", sheet)
+
+
+def test_a_cyclist_morning_describes_the_night_before_and_carries_that_days_training(tmp_path):
+    days = [f"Day {i}" for i in range(1, 41)]
+    head = ["ID", "Group", "Gender", "Variable", *days]
+    hrv = [str(40 + i % 5) for i in range(40)]
+    daily = [head, ["2", "1", "1", "HRV", *hrv], ["2", "1", "1", "RHR", *["55"] * 40]]
+    daily += [["2", "1", "1", item, *["3"] * 40] for item in ("SleepQuality", "DOMS", "Fatigue", "Stress")]
+    daily += [["2", "1", "1", "Wellbeing", *["-6"] * 40]]
+    write_xlsx(tmp_path / "Daily_Data.xlsx", daily)
+    # Sideways, like the study's file. Days 1 to 9 were baseline with no training.
+    training = [
+        ["ID", "2"],
+        ["Group", "1"],
+        *[[d, "High" if d == "Day 12" else ("Low" if i >= 9 else "")] for i, d in enumerate(days)],
+    ]
+    write_xlsx(tmp_path / "Daily_Training.xlsx", training)
+
+    t = D.cyclists(tmp_path)
+    assert len(t) == 40 and t["person_id"].iloc[0] == "cyclist_2"
+    # Day 1's morning reading is the first night.
+    assert t["night_date"].iloc[0] == "2000-01-01" and t["hrv_night_ms"].iloc[0] == 40
+    # The morning of day 13 follows the night of day 12, so it carries day 12's training.
+    assert t["cyclist_training_prev_day"].iloc[12] == "High"
+    assert t["cyclist_training_prev_day"].iloc[:10].isna().all()
+    # No sleep window, but the morning reading still counts, so z-scores appear once a week of history exists.
+    assert t["usable_hrv"].all() and t["z_hrv"].iloc[:7].isna().all() and t["z_hrv"].iloc[7:].notna().all()
+    assert t["age"].iloc[0] == 41 and t["gender"].iloc[0] == "MALE"
+
+
 def test_xlsx_rows_are_read_without_openpyxl(tmp_path):
     sheet = (
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'

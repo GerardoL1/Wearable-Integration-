@@ -9,6 +9,7 @@ The --data folder holds what was downloaded as is:
     pmdata/pmdata/p01 ... p16 and participant-overview.xlsx     (OSF vx4bk)
     lifesnaps/rais_anonymized.zip                               (Zenodo 7229547)
     fatigue_zenodo/day_activity_features.csv and the surveys    (Zenodo 8018238)
+    osf_cyclists/Daily_Data.xlsx and Daily_Training.xlsx        (OSF w6bzq)
 A dataset that isn't there is skipped. The table and summary are written to --out (default: the --data
 folder). That's other people's health data, so it's refused inside the repo, like export_training_table.py.
 """
@@ -24,7 +25,7 @@ import public_datasets as D
 REPO = Path(__file__).resolve().parent.parent
 
 parser = argparse.ArgumentParser(description="Build the training table from public wearable datasets.")
-parser.add_argument("--data", required=True, type=Path, help="folder with pmdata/, lifesnaps/ and fatigue_zenodo/")
+parser.add_argument("--data", required=True, type=Path, help="folder with the downloaded datasets (see above)")
 parser.add_argument("--finnish", type=Path, help="Dryad zip of the Finnish immigrants study")
 parser.add_argument("--uci", type=Path, help="Dryad zip of the UC Irvine students study")
 parser.add_argument("--out", type=Path, help="folder for the table and summary (default: --data)")
@@ -40,6 +41,7 @@ sources = {
     "fatigue study": (args.data / "fatigue_zenodo", D.fatigue_study),
     "Finnish immigrants": (args.finnish, D.finnish_immigrants),
     "UC Irvine students": (args.uci, D.uci_students),
+    "HRV cyclists": (args.data / "osf_cyclists", D.cyclists),
 }
 parts = []
 for name, (path, read) in sources.items():
@@ -72,6 +74,7 @@ summary = {
     "labels": {
         "real readiness 1-10 (PMData)": int(table.get("checkin_ready_to_train", pd.Series()).notna().sum()),
         "tired yesterday 0-4 (fatigue study)": int(table.get("fatigue_tired_yesterday", pd.Series()).notna().sum()),
+        "morning wellbeing with HRV (cyclists)": int(table.get("cyclist_wellbeing", pd.Series()).notna().sum()),
     },
     "people_by_gender": people["gender"].fillna("unknown").value_counts().to_dict(),
     "people_by_age_band": people["age_band"].fillna("unknown").value_counts().to_dict(),
